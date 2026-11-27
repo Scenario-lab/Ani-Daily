@@ -1,0 +1,3299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Anijam 工具报错排查看板</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-sub: #f8fafc;
+    --border: #e5e7eb;
+    --border-strong: #d1d5db;
+    --text: #0f172a;
+    --text-2: #475569;
+    --muted: #94a3b8;
+
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-soft: #eef2ff;
+    --accent-border: #c7d2fe;
+
+    --danger: #e11d48;
+    --danger-hover: #be123c;
+    --danger-soft: #fff1f2;
+    --danger-border: #fecdd3;
+
+    --warn: #d97706;
+    --warn-soft: #fffbeb;
+    --warn-border: #fde68a;
+
+    --ok: #059669;
+    --ok-soft: #ecfdf5;
+    --ok-border: #a7f3d0;
+
+    --code-bg: #18181b;
+    --code-text: #e4e4e7;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --shadow-xs: 0 1px 2px rgba(15, 23, 42, .04);
+    --shadow-sm: 0 2px 8px rgba(15, 23, 42, .06);
+    --shadow-md: 0 8px 24px rgba(15, 23, 42, .08);
+
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: var(--font-sans);
+    background: var(--bg); color: var(--text); font-size: 13.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Slim modern scrollbars */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .35); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, .55); }
+
+  /* ================= TOPBAR ================= */
+  .topbar {
+    height: 56px; background: rgba(255, 255, 255, .94); backdrop-filter: blur(12px);
+    display: flex; align-items: center; gap: 12px; padding: 0 16px;
+    border-bottom: 1px solid var(--border); z-index: 30; position: relative;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 9px; white-space: nowrap; flex-shrink: 0;
+  }
+  .brand-icon {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; box-shadow: 0 2px 6px rgba(79, 70, 229, .28);
+  }
+  .brand-title { font-weight: 700; font-size: 14.5px; color: var(--text); letter-spacing: -.01em; }
+  .status-pill {
+    font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 99px;
+    border: 1px solid var(--border); background: var(--surface-sub); color: var(--text-2);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .status-pill.err { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
+  .status-pill.ok { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-border); }
+
+  .search-wrap {
+    display: flex; align-items: center; background: var(--surface-sub);
+    border: 1px solid var(--border); border-radius: 9px; padding: 3px 6px 3px 10px;
+    flex: 1; max-width: 500px; gap: 6px; transition: .15s;
+  }
+  .search-wrap:focus-within {
+    background: #fff; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 70, 229, .1);
+  }
+  .search-wrap input {
+    background: transparent; border: none; outline: none; color: var(--text);
+    flex: 1; font-size: 12.5px; min-width: 100px;
+  }
+  .search-wrap input::placeholder { color: var(--muted); }
+  .search-wrap select {
+    background: #fff; color: var(--text-2); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 11px; padding: 2px 6px; outline: none; cursor: pointer;
+  }
+  .search-nav { display: flex; align-items: center; gap: 3px; font-size: 11.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+  .btn {
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    padding: 5px 11px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; transition: all .14s ease;
+    font-family: inherit;
+  }
+  .btn:hover:not(:disabled) { background: var(--surface-sub); border-color: var(--border-strong); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+    box-shadow: 0 1px 2px rgba(79, 70, 229, .24);
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-danger-ghost { color: var(--danger); border-color: var(--danger-border); background: #fff; }
+  .btn-danger-ghost:hover:not(:disabled) { background: var(--danger-soft); border-color: #fda4af; }
+  .btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+  .btn-danger:hover:not(:disabled) { background: var(--danger-hover); border-color: var(--danger-hover); }
+  .btn-active { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+  .btn-xs { padding: 3px 7px; font-size: 11.5px; border-radius: 6px; }
+  .btn-icon { padding: 3px 6px; font-size: 11px; border-radius: 6px; }
+  .top-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .divider-v { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+  /* ================= 3-COLUMN LAYOUT ================= */
+  .layout {
+    display: grid; grid-template-columns: 278px 1fr 418px;
+    height: calc(100vh - 56px); overflow: hidden;
+  }
+  .sidebar-left, .sidebar-right {
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sidebar-right { border-right: none; border-left: 1px solid var(--border); }
+
+  .panel-sec { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .sec-title {
+    font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .04em; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  }
+  .sec-link { font-size: 11.5px; font-weight: 500; color: var(--accent); cursor: pointer; text-transform: none; letter-spacing: 0; }
+  .sec-link:hover { text-decoration: underline; }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .stat-card {
+    background: var(--surface-sub); border: 1px solid var(--border); border-radius: var(--radius-md);
+    padding: 8px 10px; transition: .15s;
+  }
+  .stat-card.clickable { cursor: pointer; }
+  .stat-card.clickable:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-xs); }
+  .stat-card.err { background: var(--danger-soft); border-color: var(--danger-border); }
+  .stat-card.err .v { color: var(--danger); }
+  .stat-card.ok { background: var(--ok-soft); border-color: var(--ok-border); }
+  .stat-card.ok .v { color: var(--ok); }
+  .stat-card.warn { background: var(--warn-soft); border-color: var(--warn-border); }
+  .stat-card.warn .v { color: var(--warn); }
+  .stat-card.accent { background: var(--accent-soft); border-color: var(--accent-border); }
+  .stat-card.accent .v { color: var(--accent); }
+  .stat-card .v { font-size: 17px; font-weight: 700; color: var(--text); line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .stat-card .k { font-size: 11px; color: var(--text-2); margin-top: 2px; display: flex; justify-content: space-between; }
+
+  .filter-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pill {
+    padding: 4px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); background: #fff; color: var(--text-2);
+    user-select: none; transition: all .13s;
+  }
+  .pill:hover { background: var(--surface-sub); border-color: var(--border-strong); color: var(--text); }
+  .pill.on { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+  .pill.on.red { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
+
+  .scroll-list { flex: 1; overflow-y: auto; padding: 8px 12px; }
+
+  /* Multi-session list */
+  .session-box {
+    max-height: 148px; overflow-y: auto; border: 1px solid var(--border);
+    border-radius: var(--radius-md); background: var(--surface-sub); padding: 4px;
+  }
+  .sess-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    padding: 5px 8px; border-radius: 7px; cursor: pointer; font-size: 12px; transition: .12s;
+  }
+  .sess-item:hover { background: #eef2f6; }
+  .sess-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .sess-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+  .tool-row, .day-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    padding: 5px 8px; border-radius: 7px; cursor: pointer; font-size: 12px; margin-bottom: 2px; transition: .12s;
+  }
+  .tool-row:hover, .day-item:hover { background: var(--surface-sub); }
+  .tool-row.active { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+  .day-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .tool-row .tname {
+    font-family: var(--font-mono); font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+  }
+  .cnt {
+    font-size: 10.5px; color: var(--text-2); background: #f1f5f9;
+    padding: 1px 6px; border-radius: 99px; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .cnt.err { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+  .cnt.warn { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+  .cnt.ok { background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+
+  /* ================= CENTER WORKSPACE ================= */
+  .chat-col { display: flex; flex-direction: column; overflow: hidden; background: var(--bg); position: relative; }
+
+  /* 6. Session Config Ribbon */
+  .config-bar {
+    background: #fff; border-bottom: 1px solid var(--border);
+    padding: 7px 16px; display: none; align-items: center; gap: 8px; min-height: 38px;
+  }
+  .config-bar.show { display: flex; }
+  .bar-label {
+    font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  }
+  .config-strip {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px; flex: 1; font-size: 12px;
+  }
+  .cfg-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 6px; background: var(--surface-sub);
+    border: 1px solid var(--border); color: var(--text); font-weight: 500; font-size: 11.5px;
+  }
+  .cfg-chip.primary { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+  .cfg-chip.visual { background: #f5f3ff; border-color: #ddd6fe; color: #6d28d9; font-size: 10.5px; }
+  .cfg-dot { color: #cbd5e1; font-weight: 700; user-select: none; }
+
+  /* 5. Live Production Stage Tracker */
+  .stage-bar {
+    background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px; display: none; flex-direction: column; gap: 6px;
+  }
+  .stage-bar.show { display: flex; }
+  .stage-bar-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  }
+  .stage-current-wrap { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; }
+  .stage-active-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 99px; font-weight: 700; font-size: 11.5px;
+    background: var(--accent); color: #fff; box-shadow: 0 1px 4px rgba(79, 70, 229, .28);
+  }
+  .stage-active-badge.unknown { background: #64748b; box-shadow: none; }
+  .stage-basis-tag {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-2);
+    background: #f1f5f9; padding: 2px 7px; border-radius: 5px; max-width: 340px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .stage-furthest {
+    font-size: 11.5px; color: var(--text-2); display: inline-flex; align-items: center; gap: 5px;
+  }
+  .stage-steps {
+    display: flex; align-items: center; gap: 4px; overflow-x: auto; padding-bottom: 2px;
+  }
+  .stage-step {
+    padding: 3px 9px; border-radius: 7px; font-size: 11px; font-weight: 500;
+    border: 1px solid var(--border); background: #fff; color: #94a3b8;
+    white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;
+    transition: all .14s; cursor: default;
+  }
+  .stage-step.reached {
+    color: var(--text-2); border-color: #cbd5e1; background: #fff; cursor: pointer;
+  }
+  .stage-step.reached:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .stage-step.current {
+    background: var(--accent-soft); border-color: var(--accent); color: var(--accent);
+    font-weight: 700; box-shadow: 0 0 0 2px rgba(79, 70, 229, .14);
+  }
+  .stage-step .s-dot { width: 6px; height: 6px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0; }
+  .stage-step.reached .s-dot { background: #10b981; }
+  .stage-step.current .s-dot { background: var(--accent); }
+  .stage-step .s-err-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
+  .stage-arrow { color: #cbd5e1; font-size: 10px; user-select: none; flex-shrink: 0; }
+
+  /* Chat Toolbar */
+  .chat-toolbar {
+    background: rgba(255, 255, 255, .86); border-bottom: 1px solid var(--border);
+    padding: 7px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .pager { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-2); }
+  .pager input {
+    width: 46px; text-align: center; border: 1px solid var(--border); border-radius: 6px;
+    padding: 3px; font-size: 12px; color: var(--text); outline: none;
+  }
+  .pager input:focus { border-color: var(--accent); }
+  .pager select {
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px;
+    font-size: 11.5px; color: var(--text-2); background: #fff; outline: none;
+  }
+  .trans-status {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-2);
+  }
+
+  /* Chat Stream */
+  .chat-stream { flex: 1; overflow-y: auto; padding: 18px 24px 72px; }
+
+  .dropzone {
+    max-width: 620px; margin: 56px auto; background: #fff;
+    border: 1.5px dashed #cbd5e1; border-radius: 18px; padding: 44px 34px; text-align: center;
+    box-shadow: var(--shadow-sm); transition: .2s;
+  }
+  .dropzone:hover { border-color: var(--accent); }
+  .dropzone-icon {
+    width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 16px;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dropzone h2 { margin: 0 0 8px; font-size: 19px; font-weight: 700; color: var(--text); }
+  .dropzone p { color: var(--text-2); line-height: 1.75; margin: 0 0 20px; font-size: 13px; text-align: left; }
+  .dropzone-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; text-align: left;
+  }
+  .dz-feat {
+    background: var(--surface-sub); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; color: var(--text-2); line-height: 1.5;
+  }
+  .dz-feat b { display: block; color: var(--text); margin-bottom: 2px; font-size: 12.5px; }
+
+  .drop-overlay {
+    position: fixed; inset: 0; background: rgba(79, 70, 229, .1); backdrop-filter: blur(4px);
+    border: 3px dashed var(--accent); z-index: 999; display: none;
+    align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: var(--accent);
+  }
+  .drop-overlay.show { display: flex; }
+
+  .date-divider { text-align: center; margin: 18px 0 14px; }
+  .date-divider span {
+    background: #e2e8f0; color: #475569; font-size: 11px; font-weight: 600;
+    padding: 3px 12px; border-radius: 99px;
+  }
+  .stage-divider {
+    display: flex; align-items: center; gap: 10px; margin: 14px 0 12px;
+    font-size: 11px; color: var(--accent); font-weight: 600;
+  }
+  .stage-divider::before, .stage-divider::after { content: ""; flex: 1; border-top: 1px dashed #c7d2fe; }
+  .stage-divider span {
+    background: var(--accent-soft); border: 1px solid var(--accent-border);
+    padding: 2px 10px; border-radius: 99px;
+  }
+  .ctx-gap {
+    text-align: center; margin: 14px 0; font-size: 11.5px; color: var(--muted);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ctx-gap::before, .ctx-gap::after { content: ""; flex: 1; border-top: 1px dashed #cbd5e1; }
+
+  /* Message Rows */
+  .msg-row {
+    display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-start;
+    padding: 6px 8px; border-radius: 12px; border: 1.5px solid transparent;
+    transition: background .12s, border-color .12s; cursor: pointer;
+  }
+  .msg-row:hover { background: rgba(255, 255, 255, .55); }
+  .msg-row.selected {
+    background: rgba(238, 242, 255, .55); border-color: var(--accent-border);
+  }
+  .msg-row.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 11.5px; color: #fff; margin-top: 2px;
+  }
+  .avatar.agent { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+  .avatar.user { background: linear-gradient(135deg, #0ea5e9, #2563eb); }
+  .avatar.err { background: linear-gradient(135deg, #f43f5e, #e11d48); }
+  .avatar.cancel { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .avatar.heal { background: linear-gradient(135deg, #10b981, #059669); }
+  .avatar.tool { background: #475569; }
+
+  .bubble-wrap { max-width: 82%; display: flex; flex-direction: column; gap: 4px; }
+  .msg-row.user .bubble-wrap { align-items: flex-end; }
+  .msg-meta {
+    font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .msg-meta b { color: var(--text-2); font-weight: 600; }
+  .msg-row.user .msg-meta { justify-content: flex-end; }
+  .mid-tag {
+    font-family: var(--font-mono); font-size: 10px;
+    background: #eef2f6; color: var(--text-2); padding: 1px 5px; border-radius: 4px; cursor: pointer;
+  }
+  .mid-tag:hover { background: #e2e8f0; color: var(--text); }
+  .stage-mini {
+    font-size: 10px; padding: 1px 6px; border-radius: 99px;
+    background: #f1f5f9; color: #475569; font-weight: 500;
+  }
+  .wait-tag {
+    background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-border);
+    padding: 0 5px; border-radius: 4px; font-weight: 600; font-size: 10px;
+  }
+
+  .bubble {
+    padding: 11px 14px; border-radius: 13px; line-height: 1.6; word-break: break-word;
+    box-shadow: var(--shadow-xs); position: relative; font-size: 13.5px;
+  }
+  .msg-row.agent .bubble {
+    background: #ffffff; color: var(--text); border: 1px solid var(--border); border-top-left-radius: 4px;
+  }
+  .msg-row.user .bubble {
+    background: #eef2ff; color: #1e1b4b; border: 1px solid #c7d2fe; border-top-right-radius: 4px;
+  }
+
+  /* Translation block (Works identically on both User & Agent bubbles) */
+  .zh-trans {
+    margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(15, 23, 42, .12);
+    font-size: 12.5px; line-height: 1.58; color: #334155;
+    display: flex; align-items: flex-start; gap: 7px;
+  }
+  .msg-row.user .zh-trans { border-top-color: rgba(79, 70, 229, .2); color: #312e81; }
+  .zh-badge {
+    background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+    font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .msg-row.user .zh-badge { background: #e0e7ff; color: #4338ca; border-color: #c7d2fe; }
+  .zh-text { flex: 1; white-space: pre-wrap; }
+  .zh-text.pending { color: var(--muted); font-style: italic; cursor: pointer; }
+  .zh-text.pending:hover { color: var(--accent); }
+
+  .ref-imgs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .ref-imgs img {
+    width: 72px; height: 72px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); cursor: zoom-in; background: #0f172a; transition: .15s;
+  }
+  .ref-imgs img:hover { transform: scale(1.03); }
+
+  /* Inline Tool Error Diagnostic Card */
+  .err-card {
+    background: #fff; border: 1px solid var(--danger-border); border-left: 4px solid var(--danger);
+    border-radius: 12px; overflow: hidden; box-shadow: 0 3px 12px rgba(225, 29, 72, .07);
+    min-width: 340px; max-width: 720px; width: 100%;
+  }
+  .err-card.cancelled {
+    border-color: var(--warn-border); border-left-color: var(--warn);
+    box-shadow: 0 2px 8px rgba(217, 119, 6, .06);
+  }
+  .msg-row.pulse .err-card, .msg-row.pulse .bubble { animation: pulseErr 1.6s ease-out; }
+  @keyframes pulseErr {
+    0% { box-shadow: 0 0 0 6px rgba(225, 29, 72, .45); }
+    100% { box-shadow: 0 0 0 1px rgba(225, 29, 72, .1); }
+  }
+  .err-head {
+    padding: 8px 12px; background: var(--danger-soft); border-bottom: 1px solid var(--danger-border);
+    display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .err-card.cancelled .err-head { background: var(--warn-soft); border-bottom-color: var(--warn-border); }
+  .err-head-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .err-seq {
+    background: var(--danger); color: #fff; font-size: 10.5px; font-weight: 700;
+    padding: 1px 7px; border-radius: 99px; font-family: var(--font-mono);
+  }
+  .err-card.cancelled .err-seq { background: var(--warn); }
+  .err-tool { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--text); }
+  .err-model {
+    font-size: 10.5px; color: var(--text-2); background: #fff; border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 5px;
+  }
+  .err-body { padding: 10px 12px; }
+  .err-raw {
+    background: var(--code-bg); color: #fda4af; border-radius: 8px; padding: 9px 11px;
+    font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto;
+  }
+  .err-card.cancelled .err-raw { color: #fde68a; }
+  .err-actions {
+    margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .err-details {
+    margin-top: 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-sub); overflow: hidden;
+  }
+  .err-details summary {
+    padding: 6px 10px; font-size: 11.5px; font-weight: 600; color: var(--text-2); cursor: pointer; user-select: none;
+  }
+  .err-details pre {
+    margin: 0; padding: 9px 11px; background: var(--code-bg); color: var(--code-text);
+    font-family: var(--font-mono); font-size: 11px; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow-y: auto;
+  }
+
+  /* Compact self-healed pill in chat stream (kept unobtrusive) */
+  .heal-details {
+    border: 1px solid var(--ok-border); border-radius: 9px; background: var(--ok-soft);
+    max-width: 680px; width: 100%; overflow: hidden;
+  }
+  .heal-details summary {
+    padding: 6px 10px; font-size: 11.5px; color: #065f46; font-weight: 600;
+    cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .heal-details-body { padding: 8px 10px; background: #fff; border-top: 1px solid var(--ok-border); }
+
+  .cat-badge { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+  .rec-badge { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+  .rec-self { background: var(--ok-soft); color: #065f46; }
+  .rec-switch { background: #d1fae5; color: #047857; }
+  .rec-user { background: #dbeafe; color: #1e40af; }
+  .rec-none { background: var(--danger-soft); color: var(--danger); }
+  .rec-cxl  { background: var(--warn-soft); color: #92400e; }
+
+  .media-card {
+    background: #0f172a; color: #f8fafc; border-radius: 12px; overflow: hidden;
+    border: 1px solid #334155; width: 320px; max-width: 100%; box-shadow: var(--shadow-sm);
+  }
+  .media-head {
+    padding: 7px 10px; background: #1e293b; display: flex; justify-content: space-between;
+    align-items: center; font-size: 11.5px; gap: 8px;
+  }
+  .media-head .model { font-weight: 600; color: #38bdf8; }
+  .media-body video { width: 100%; max-height: 260px; display: block; background: #000; }
+  .media-body img { width: 100%; max-height: 260px; object-fit: contain; display: block; cursor: zoom-in; }
+  .media-foot {
+    padding: 6px 10px; display: flex; justify-content: space-between; align-items: center;
+    background: #1e293b; font-size: 11px;
+  }
+  .media-foot a { color: #93c5fd; text-decoration: none; }
+  .media-foot a:hover { text-decoration: underline; }
+
+  .ui-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 13px; max-width: 450px; box-shadow: var(--shadow-xs);
+  }
+  .ui-card.credit { border-color: var(--warn-border); background: var(--warn-soft); }
+  .ui-card-title { font-weight: 600; font-size: 12.5px; margin-bottom: 7px; color: var(--text); }
+  .ui-card-opts { display: flex; flex-direction: column; gap: 4px; }
+  .ui-opt {
+    padding: 5px 9px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--surface-sub); font-size: 12px; color: var(--text-2);
+    display: flex; justify-content: space-between; gap: 6px;
+  }
+  .ui-opt.rec { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  .god-box {
+    margin-top: 6px; background: var(--code-bg); color: var(--code-text);
+    border-radius: 8px; padding: 7px 10px; font-size: 11px; border: 1px solid #27272a;
+    max-width: 680px;
+  }
+  .god-box summary { cursor: pointer; font-weight: 600; color: #a5b4fc; user-select: none; }
+  .god-box pre {
+    white-space: pre-wrap; word-break: break-word; margin: 6px 0 0;
+    font-family: var(--font-mono); font-size: 11px; color: #e4e4e7;
+    max-height: 220px; overflow-y: auto;
+  }
+  body:not(.god-on) .god-only { display: none !important; }
+
+  /* ================= RIGHT SIDEBAR ================= */
+  .right-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface-sub); padding: 0 8px; gap: 4px; }
+  .rtab {
+    flex: 1; text-align: center; padding: 11px 6px 9px; font-weight: 600; font-size: 12.5px;
+    cursor: pointer; border-bottom: 2px solid transparent; color: var(--text-2); transition: .13s;
+  }
+  .rtab:hover { color: var(--text); }
+  .rtab.active { color: var(--danger); border-bottom-color: var(--danger); }
+  .rtab[data-tab="stats"].active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .err-toolbar {
+    padding: 9px 12px; border-bottom: 1px solid var(--border); background: var(--surface-sub);
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .err-toolbar-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;
+  }
+  .err-toolbar select {
+    border: 1px solid var(--border); border-radius: 7px; padding: 4px 7px; font-size: 11.5px;
+    background: #fff; color: var(--text); outline: none; max-width: 192px;
+  }
+  .err-toolbar select:focus { border-color: var(--accent); }
+
+  .heal-hint-bar {
+    padding: 6px 10px; background: var(--ok-soft); border-bottom: 1px solid var(--ok-border);
+    font-size: 11.5px; color: #065f46; display: none; align-items: center; justify-content: space-between; gap: 6px;
+  }
+  .heal-hint-bar.show { display: flex; }
+
+  .tl-day-head {
+    position: sticky; top: -8px; z-index: 4;
+    background: var(--danger-soft); color: #9f1239; border: 1px solid var(--danger-border);
+    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 7px;
+    margin: 8px 0 8px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .tl-day-head:first-child { margin-top: 2px; }
+  .tl-wrap {
+    position: relative; padding-left: 14px;
+    border-left: 2px solid #fecdd3; margin-left: 6px;
+  }
+  .tl-card {
+    background: #fff; border: 1px solid var(--border); border-left: 3.5px solid var(--danger);
+    border-radius: 10px; padding: 9px 11px; margin-bottom: 9px; cursor: pointer;
+    transition: all .14s; position: relative; box-shadow: var(--shadow-xs);
+  }
+  .tl-card.cancelled { border-left-color: var(--warn); }
+  .tl-card::before {
+    content: ""; position: absolute; left: -20px; top: 14px;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--danger); border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #fda4af;
+  }
+  .tl-card.cancelled::before { background: var(--warn); box-shadow: 0 0 0 1px #fcd34d; }
+  .tl-card.on-page::before { background: var(--ok); box-shadow: 0 0 0 2px #a7f3d0; }
+  .tl-card:hover { box-shadow: var(--shadow-sm); border-color: var(--border-strong); }
+  .tl-card.on-page { border-color: var(--ok-border); }
+  .tl-card.active { background: var(--danger-soft); box-shadow: 0 0 0 2px var(--danger); border-color: var(--danger); }
+  .tl-card.cancelled.active { background: var(--warn-soft); box-shadow: 0 0 0 2px var(--warn); border-color: var(--warn); }
+  .tl-top { display: flex; justify-content: space-between; align-items: center; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; }
+  .tl-time {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .page-chip {
+    font-size: 10px; padding: 1px 6px; border-radius: 99px; background: #f1f5f9;
+    color: var(--text-2); border: 1px solid var(--border);
+  }
+  .page-chip.here { background: var(--ok-soft); color: #065f46; border-color: var(--ok-border); font-weight: 700; }
+  .tl-tool {
+    font-family: var(--font-mono); font-size: 11.5px; font-weight: 600;
+    color: var(--text); margin-bottom: 5px; word-break: break-all;
+  }
+  .tl-err-snip {
+    font-family: var(--font-mono); font-size: 11px; line-height: 1.48;
+    background: var(--code-bg); color: #fda4af; padding: 6px 8px; border-radius: 7px;
+    margin-bottom: 6px; word-break: break-word;
+  }
+  .tl-card.cancelled .tl-err-snip { color: #fde68a; }
+  .tl-uctx {
+    font-size: 11px; color: var(--text-2); background: var(--surface-sub); padding: 4px 8px;
+    border-radius: 6px; border-left: 2px solid #cbd5e1; margin-bottom: 6px;
+  }
+  .tl-foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; }
+
+  /* Analytics Tab */
+  .kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 14px; }
+  .kpi-mini {
+    border: 1px solid var(--border); border-radius: 10px; padding: 8px 9px; background: var(--surface-sub);
+  }
+  .kpi-mini.err { background: var(--danger-soft); border-color: var(--danger-border); }
+  .kpi-mini.ok { background: var(--ok-soft); border-color: var(--ok-border); }
+  .kpi-mini.accent { background: var(--accent-soft); border-color: var(--accent-border); }
+  .kpi-mini .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi-mini.err .v { color: var(--danger); }
+  .kpi-mini.ok .v { color: var(--ok); }
+  .kpi-mini.accent .v { color: var(--accent); }
+  .kpi-mini .k { font-size: 10.5px; color: var(--text-2); margin-top: 2px; }
+
+  .stat-block {
+    margin-bottom: 14px; background: #fff; border: 1px solid var(--border);
+    border-radius: 11px; padding: 10px 12px;
+  }
+  .stat-block h4 {
+    margin: 0 0 9px; font-size: 12px; font-weight: 700; color: var(--text);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .bar-row { margin-bottom: 7px; cursor: pointer; padding: 4px 6px; border-radius: 7px; transition: .12s; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-row:hover { background: var(--surface-sub); }
+  .bar-head { display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px; gap: 8px; }
+  .bar-track { height: 7px; background: #f1f5f9; border-radius: 99px; overflow: hidden; display: flex; }
+  .bar-fill { height: 100%; transition: width .25s; }
+
+  mark.hl { background: #fef08a; color: #0f172a; padding: 0 2px; border-radius: 3px; font-weight: 600; }
+
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, .72); backdrop-filter: blur(4px);
+    z-index: 1000; display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-bg.show { display: flex; }
+  .lightbox-img { max-width: 92vw; max-height: 88vh; border-radius: 12px; box-shadow: 0 16px 48px rgba(0, 0, 0, .45); }
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: #0f172a; color: #fff; padding: 8px 16px; border-radius: 99px;
+    font-size: 12.5px; box-shadow: 0 8px 24px rgba(15, 23, 42, .28); z-index: 2000; display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="drop-overlay" id="dropOverlay">📂 松开鼠标即可加载对话 JSON（支持多文件或 ZIP 压缩包）</div>
+<div class="toast" id="toast"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+    </div>
+    <span class="brand-title">Anijam 报错排查看板</span>
+    <span class="status-pill" id="pidBadge">待加载</span>
+  </div>
+
+  <div class="search-wrap">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="searchInput" type="text" placeholder="搜索报错原文 / 工具名 / 入参 / 原话或译文 / call_id..." />
+    <select id="searchScope" title="搜索范围">
+      <option value="all">全局</option>
+      <option value="err">仅报错与入参</option>
+      <option value="user">仅用户原话</option>
+    </select>
+    <div class="search-nav">
+      <span id="searchCount">0/0</span>
+      <button class="btn btn-icon" id="btnPrevHit" title="上一个 (Shift+Enter)">▲</button>
+      <button class="btn btn-icon" id="btnNextHit" title="下一个 (Enter)">▼</button>
+    </div>
+  </div>
+
+  <div class="top-actions">
+    <button class="btn btn-primary" id="btnUploadJson">📂 上传 JSON / ZIP</button>
+    <input type="file" id="fileJson" accept=".json,.zip" multiple hidden />
+    <button class="btn btn-danger-ghost" id="btnClearJson" disabled title="一键清空当前加载的 JSON / 会话数据">🗑️ 清空</button>
+    <div class="divider-v"></div>
+    <button class="btn" id="btnGodMode" title="展开非报错后台工具、AI 思考过程与自愈细节">👁️ 全量细节：关</button>
+    <button class="btn" id="btnExportCsv" disabled title="导出当前报错明细 CSV">📥 CSV</button>
+    <button class="btn" id="btnExportJson" disabled title="导出结构化报错 JSON">📤 JSON</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar-left">
+    <div class="panel-sec" id="multiSessionSec" style="display:none;">
+      <div class="sec-title">
+        <span>已加载会话 (<span id="sessTotalCnt">0</span>)</span>
+        <label style="font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:4px;text-transform:none;letter-spacing:0;color:var(--text-2);">
+          <input type="checkbox" id="chkOnlyErrSess" /> 仅看有报错
+        </label>
+      </div>
+      <div class="session-box" id="sessionList"></div>
+    </div>
+
+    <div class="panel-sec">
+      <div class="sec-title">
+        <span>工具健康概览</span>
+        <span id="uidText" style="font-weight:500;text-transform:none;letter-spacing:0;font-family:var(--font-mono);font-size:10.5px;"></span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card err"><div class="v" id="stErr">0</div><div class="k"><span>真实报错</span><span>不含自愈</span></div></div>
+        <div class="stat-card ok clickable" id="cardSelfHeal" title="点击查看「归类统计」中的 Agent 自愈分布"><div class="v" id="stHeal">0</div><div class="k"><span>Agent 自愈</span><span>统计↗</span></div></div>
+        <div class="stat-card warn"><div class="v" id="stCxl">0</div><div class="k"><span>被取消</span><span id="stToolAllSub">共0次</span></div></div>
+        <div class="stat-card accent"><div class="v" id="stRate">-</div><div class="k"><span>有效成功率</span><span>去取消</span></div></div>
+      </div>
+    </div>
+
+    <div class="panel-sec">
+      <div class="sec-title">快捷视图</div>
+      <div class="filter-pills">
+        <div class="pill red" id="pillErrCtx" title="只展示每次真实报错前后各 2 条对话上下文">报错上下文(±2)</div>
+        <div class="pill red" id="pillOnlyErr" title="仅显示报错卡片">仅看报错卡片</div>
+        <div class="pill" id="pillShowCxl" title="在报错时间轴与对话中展示被新消息打断取消的调用">含被取消调用</div>
+        <div class="pill on" id="pillShowMedia" title="显示正常生成的视频与图片">显示正常出片</div>
+        <div class="pill" id="pillHideConfirm" title="隐藏机械点击 Confirm 按钮">过滤 Confirm</div>
+        <div class="pill on" id="pillShowTrans" title="上面原话、下面自动翻译所有用户与 Agent 消息">自动中文翻译</div>
+      </div>
+    </div>
+
+    <div class="panel-sec" style="padding-bottom:8px;">
+      <div class="sec-title">
+        <span>按报错工具筛选</span>
+        <span class="sec-link" id="toolReset" style="display:none;">全部工具</span>
+      </div>
+      <div id="toolBreakdown" style="max-height:132px;overflow-y:auto;">
+        <div style="color:var(--muted);font-size:11.5px;">加载数据后显示各工具报错数</div>
+      </div>
+    </div>
+
+    <div class="panel-sec" style="padding-bottom:6px;border-bottom:none;">
+      <div class="sec-title" style="margin-bottom:2px;">
+        <span>按日期快速跳转</span>
+        <span class="sec-link" id="dayReset" style="display:none;">显示全部</span>
+      </div>
+    </div>
+    <div class="scroll-list" id="dayList">
+      <div style="color:var(--muted);font-size:12px;padding:4px 2px;">加载 JSON 后自动生成日期目录</div>
+    </div>
+  </aside>
+
+  <!-- CENTER WORKSPACE -->
+  <main class="chat-col">
+    <!-- 6. Session Config Ribbon -->
+    <div class="config-bar" id="configBar">
+      <span class="bar-label">⚙️ 当前配置</span>
+      <div class="config-strip" id="configStrip"></div>
+      <button class="btn btn-xs" id="btnCopyConfig" title="复制当前 SID 配置摘要">📋 复制</button>
+    </div>
+
+    <!-- 5. Live Production Stage Tracker -->
+    <div class="stage-bar" id="stageBar">
+      <div class="stage-bar-top">
+        <div class="stage-current-wrap">
+          <span class="bar-label">🎬 制作阶段</span>
+          <span class="stage-active-badge" id="curStageBadge">未识别</span>
+          <span class="stage-basis-tag" id="curStageBasis" title="点击下方任意消息可同步查看该时刻所处的制作阶段与判定依据">点击任意消息同步查看阶段</span>
+        </div>
+        <div class="stage-furthest" id="furthestStageHint"></div>
+      </div>
+      <div class="stage-steps" id="stageSteps"></div>
+    </div>
+
+    <!-- Chat Toolbar -->
+    <div class="chat-toolbar">
+      <div class="pager">
+        <button class="btn btn-xs" id="btnFirstPage">⏮</button>
+        <button class="btn btn-xs" id="btnPrevPage">上一页</button>
+        <span>第 <input id="pageInput" type="number" min="1" value="1" /> / <b id="totalPages">1</b> 页</span>
+        <button class="btn btn-xs" id="btnNextPage">下一页</button>
+        <button class="btn btn-xs" id="btnLastPage">⏭</button>
+        <select id="pageSizeSel">
+          <option value="50">50条/页</option>
+          <option value="80" selected>80条/页</option>
+          <option value="150">150条/页</option>
+        </select>
+      </div>
+      <div class="trans-status">
+        <span id="statusHint" style="color:var(--text-2);">左：Agent 与报错卡片 ｜ 右：用户原话</span>
+        <button class="btn btn-xs" id="btnRetransPage" style="display:none;" title="重新翻译本页尚未翻完的消息">🌐 重试翻译</button>
+      </div>
+    </div>
+
+    <!-- Chat Stream -->
+    <div class="chat-stream" id="chatStream">
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h2>拖入 Anijam 对话 JSON 或整包 ZIP</h2>
+        <p style="text-align:center;color:var(--text-2);margin-bottom:20px;">专注排查工具报错、制作阶段与会话配置，支持单文件、多文件与压缩包直接拖拽。</p>
+        <div class="dropzone-grid">
+          <div class="dz-feat"><b>🌐 全自动双语对照</b>用户原话与 Agent 回复自动「上原话、下译文」，翻页秒翻并本地缓存</div>
+          <div class="dz-feat"><b>🚨 精准报错与自愈分离</b>时间轴聚焦未自愈报错并关联入参，Agent 自愈单独计入「归类统计」</div>
+          <div class="dz-feat"><b>🎬 制作阶段实时联动</b>完整移植 anijam.py P1–P5 阶段引擎，点击任意消息同步刷新当前阶段</div>
+          <div class="dz-feat"><b>⚙️ 会话配置一眼看清</b>顶部直接展示当前 SID 选定的模式、引擎、受众、平台、画幅、音频、时长与风格</div>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('fileJson').click()" style="padding:10px 24px;font-size:13.5px;">选择本地 JSON / ZIP 文件</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT SIDEBAR -->
+  <aside class="sidebar-right">
+    <div class="right-tabs">
+      <div class="rtab active" data-tab="errors">🚨 报错时间轴 (<span id="tabErrCnt">0</span>)</div>
+      <div class="rtab" data-tab="stats">📊 归类统计</div>
+    </div>
+
+    <div id="tabPanelErrors" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="err-toolbar">
+        <div class="err-toolbar-row">
+          <button class="btn btn-xs" id="btnToggleErrOrder" title="切换时间正序/倒序">🕒 时间正序（最早→最晚）</button>
+          <div style="display:flex;gap:4px;">
+            <button class="btn btn-xs" id="btnPrevErr" title="按时间看上一条报错">◀ 上条</button>
+            <button class="btn btn-danger btn-xs" id="btnNextErr" title="按时间看下一条报错">下条 ▶</button>
+          </div>
+        </div>
+        <div class="err-toolbar-row">
+          <select id="catFilterSel" title="按报错分类筛选"></select>
+          <select id="recFilterSel" title="按恢复状态筛选">
+            <option value="全部">恢复状态：全部(不含自愈)</option>
+            <option value="none">🔴 未恢复</option>
+            <option value="user">👤 用户介入恢复</option>
+            <option value="cancelled">⚪ 已被取消</option>
+          </select>
+        </div>
+        <div class="err-toolbar-row" style="font-size:11.5px;color:var(--text-2);">
+          <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+            <input type="checkbox" id="chkIncludeCxl" /> 含被取消 (Cancelled)
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none;">
+            <input type="checkbox" id="chkFollowDay" /> 仅看所选日期
+          </label>
+        </div>
+      </div>
+
+      <div class="heal-hint-bar" id="healHintBar">
+        <span id="healHintText">🤖 已隐藏 0 条 Agent 自愈报错</span>
+        <span class="sec-link" style="color:#065f46;font-weight:600;" onclick="switchRightTab('stats')">去归类统计查看 →</span>
+      </div>
+
+      <div class="scroll-list" id="errList">
+        <div style="color:var(--muted);font-size:12px;padding:12px;line-height:1.65;">
+          加载 JSON 后，所有非自愈工具报错将按时间顺序排列在此。点击卡片或「下条 ▶」即可定位上下文、展开入参并同步刷新制作阶段。
+        </div>
+      </div>
+    </div>
+
+    <div id="tabPanelStats" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="scroll-list" id="statsPanel">
+        <div style="color:var(--muted);font-size:12px;padding:12px;">加载数据后自动生成报错分类、Agent 自愈与工具失败率统计。</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="modal-bg" id="lightbox" onclick="this.classList.remove('show')">
+  <img class="lightbox-img" id="lightboxImg" src="" alt="预览" />
+</div>
+
+<script>
+/* ============================================================================
+ * 1. 常量与规则表（对齐 anijam.py：阶段判定 / Tool登记表 / 配置归一 / 报错归类）
+ * ========================================================================== */
+
+const STAGE_STORY = "故事大纲";
+const STAGE_IMAGE = "图片生成";
+const STAGE_DIRECT_IMAGE = "直接生成-图片";
+const STAGE_IMAGE_EDIT = "图片修改";
+const STAGE_VIDEO = "视频生成";
+const STAGE_DIRECT_VIDEO = "直接生成-视频";
+const STAGE_VIDEO_EDIT = "视频编辑";
+const STAGE_AUDIO = "BGM / 旁白 / 配音";
+const STAGE_COMBINE = "视频合成";
+const STAGE_TIMELINE = "Timeline";
+const STAGE_UNKNOWN = "未识别";
+
+const STAGE_ORDER = [
+  STAGE_STORY,
+  STAGE_IMAGE, STAGE_DIRECT_IMAGE, STAGE_IMAGE_EDIT,
+  STAGE_VIDEO, STAGE_DIRECT_VIDEO, STAGE_VIDEO_EDIT,
+  STAGE_AUDIO, STAGE_COMBINE, STAGE_TIMELINE
+];
+const CORE_STAGES = new Set([STAGE_STORY, STAGE_IMAGE, STAGE_VIDEO, STAGE_AUDIO, STAGE_COMBINE, STAGE_TIMELINE]);
+
+const REGISTRY_STAGE_PHASE = {
+  [STAGE_STORY]: "story_outline",
+  [STAGE_IMAGE]: "image_generation",
+  [STAGE_DIRECT_IMAGE]: "image_task",
+  [STAGE_IMAGE_EDIT]: "image_modify",
+  [STAGE_VIDEO]: "clip",
+  [STAGE_DIRECT_VIDEO]: "video_task",
+  [STAGE_VIDEO_EDIT]: "video_edit",
+  [STAGE_AUDIO]: "narration",
+  [STAGE_COMBINE]: "videocombine",
+  [STAGE_TIMELINE]: "timeline"
+};
+
+const PL_PHASE_GROUPS = {
+  [STAGE_STORY]: ["mode_selection","project_config","co_design","story_outline","create_scripts","script","style_design","mode_state","art_inspiration"],
+  [STAGE_IMAGE]: ["concept_design","concept_for_oscar","image_generation","image","keyframe","keyframe_generation"],
+  [STAGE_VIDEO]: ["story_segment","storyboard_plan","storyboard","shot_plan","quick_mode_video","video_generation","video_generation_oscar","clip","video_clip","video_clips"],
+  [STAGE_DIRECT_IMAGE]: ["image_task"],
+  [STAGE_IMAGE_EDIT]: ["image_modify","image_edit","image_editing"],
+  [STAGE_DIRECT_VIDEO]: ["video_task"],
+  [STAGE_VIDEO_EDIT]: ["video_edit","video_editing","video_modify","omni_edit","edit_video_segment"],
+  [STAGE_AUDIO]: ["narration","narration_for_ai_director","narration_for_oscar","bgm","bgm_for_ai_director","bgm_for_oscar","audio","voice","dubbing","remove_video_audio","story_audio"],
+  [STAGE_COMBINE]: ["videocombine","video_combine","combine","combine_video"],
+  [STAGE_TIMELINE]: ["timeline"]
+};
+const PL_PHASE2GROUP = {};
+Object.entries(PL_PHASE_GROUPS).forEach(([g, ps]) => ps.forEach(p => { PL_PHASE2GROUP[p] = g; }));
+
+const _TOOL_REGISTRY_GROUPS = [
+  ["控制", "", "", "show_next_steps read_story_section modify_story_section write_todos read_file choose_skill show_outline_card search_style_library show_style_picker show_next_events show_next_episode show_credit_estimate search_style_by_criteria report_user_intent_choice show_voice_picker report_generation_failure grep ls search_my_style_by_id show_music_planning_card write_file execute show_video_modify_card video_edit_confirm show_motion_card"],
+  ["辅助", "", "image", "image_caption"],
+  ["辅助", "", "audio", "audio_analysis"],
+  ["辅助", "", "", "mv_recommendation mv_check_shot analyze_media"],
+  ["流程", STAGE_STORY, "", "review_asset extract_asset review_shot_plan"],
+  ["流程", STAGE_VIDEO, "", "build_quick_video_segments review_quick_video_segments four_grid_plan build_director_video_segments"],
+  ["流程", STAGE_TIMELINE, "", "inspect_timeline"],
+  ["生产", STAGE_STORY, "", "create_story_outline create_scripts apply_pending_script_document style_summary create_my_style"],
+  ["生产", STAGE_IMAGE, "image", "generate_images_batch generate_image_simple_batch generate_image_by_nano_banana_reference_par_fal generate_image_by_nano_banana_text_fal generate_image_by_nano_banana_reference_keyframe_par_fal generate_image_by_seedream50_reference_par_fal generate_image_by_seedream45_text_par_fal"],
+  ["生产", STAGE_IMAGE_EDIT, "image", "edit_image_by_model"],
+  ["生产", STAGE_VIDEO, "image", "generate_fourgrid_auto"],
+  ["生产", STAGE_VIDEO, "video", "generate_multi_reference_videos_batch generate_multi_reference_videos_batch_oscar generate_multi_reference_videos_by_doubao2m_batch generate_multi_reference_videos_by_doubao2m_batch_oscar generate_multi_reference_videos_by_seedance_batch generate_multi_reference_videos_by_seedance_batch_oscar generate_multi_reference_videos_by_seedance_batch_fast generate_multi_reference_videos_by_seedance_batch_oscar_fast generate_multi_reference_videos_by_minimax_h3_768p_batch generate_multi_reference_videos_by_minimax_h3_768p_batch_oscar generate_multi_reference_videos_by_minimax_h3_2k_batch generate_multi_reference_videos_by_minimax_h3_2k_batch_oscar generate_multi_reference_videos_by_minimax_h3_batch_oscar generate_multi_reference_videos_by_klingo3_batch generate_multi_reference_videos_by_wan27_batch generate_video_by_wan27_multireferencetovideo_batch generate_video_by_minimax_h3_simple_batch generate_video_by_seedance_simple_batch generate_video_by_seedance_simple generate_videos_by_seedance_batch mv_batch_shot_gen mv_batch_shot_gen_by_seedance2 generate_motion_transfer_videos_batch"],
+  ["生产", STAGE_DIRECT_VIDEO, "video", "video_task motion_task"],
+  ["生产", STAGE_DIRECT_IMAGE, "image", "image_task"],
+  ["生产", STAGE_VIDEO_EDIT, "video", "edit_video_segment edit_video_segment_by_omni"],
+  ["生产", STAGE_AUDIO, "audio", "generate_BGM generate_BGM_oscar generate_BGM_legacy generate_BGM_oscar_legacy generate_narration_batch generate_audio_by_lyria3_pro"],
+  ["生产", STAGE_COMBINE, "video", "remove_video_audio video_combiner"],
+  ["生产", STAGE_TIMELINE, "", "orchestrate_timeline delete_timeline_rails"]
+];
+const TOOL_REGISTRY = {};
+_TOOL_REGISTRY_GROUPS.forEach(([kind, stage, media, names]) => {
+  names.split(/\s+/).forEach(n => { if (n) TOOL_REGISTRY[n.toLowerCase()] = { kind, stage, media }; });
+});
+
+const UNREG_CONTROL_RE = /^(show_|read_|search_|report_|list_|get_)|confirm|picker|_card$/i;
+const PL_PRODUCTION_RE = /(^generate|_batch$|combiner|video_?combine|combine_video|render|create_story_outline|style_summary|omni|edit_video|timeline)/i;
+const PL_TOOL_FALLBACK = [
+  [/omni|edit_video|video_edit/i, "video_edit"],
+  [/combiner|video_?combine|combine_video/i, "videocombine"],
+  [/bgm/i, "bgm"],
+  [/narration|tts|voice|dubbing|audio/i, "narration"],
+  [/keyframe/i, "keyframe"],
+  [/generate_(multi_reference_)?video|minimax|kling|veo|doubao|seedance|wan/i, "clip"],
+  [/generate_image|nano_banana|flux|image_caption/i, "image_generation"],
+  [/story_outline|create_story|script/i, "story_outline"],
+  [/style_summary/i, "style_design"],
+  [/concept/i, "concept_design"],
+  [/timeline/i, "timeline"]
+];
+const PL_SECTION_KEY_RE = /\\?"(section|source_section|target_section|phase_id)\\?"\s*:\s*\\?"([^"\\]+)/g;
+const STAGE_LEVEL_LABELS = {
+  "P1": "P1 生产类Tool",
+  "P1.5": "P1.5 choose_skill",
+  "P2": "P2 section字段",
+  "P3": "P3 write_todos进行中",
+  "P4": "P4 继承上一阶段",
+  "P5": "P5 未识别"
+};
+
+/* Config Normalization (aligned with anijam.py) */
+const NULL_LIKE = new Set(["null","none","nil","undefined","nan","na","n/a","-","--","empty","unknown","unspecified","default","未知","不明","无","無","없음"]);
+function canonKey(s) {
+  return String(s || "").normalize("NFKC").trim().toLowerCase()
+    .replace(/[\s_\-\/\\|·・、,，.。;；:：()（）\[\]【】{}<>\"'`~!！?？*＊]+/g, "");
+}
+function isNullLike(s) {
+  const raw = String(s || "").trim().toLowerCase();
+  return !raw || NULL_LIKE.has(raw) || NULL_LIKE.has(canonKey(s));
+}
+const CONFIG_CANON_ALIASES = {
+  ai_mode: {
+    "AI Director Mode": ["ai director mode","ai_director","aidirector","director mode","AIディレクターモード","ディレクターモード","AI 디렉터 모드","AI 감독 모드","AI导演模式","AI導演模式","导演模式","modo director de IA","modo diretor de IA","mode réalisateur IA","KI-Regisseur-Modus","AI yönetmen modu"],
+    "Workflow Mode": ["workflow","workflow mode","work flow mode","ワークフローモード","ワークフロー","워크플로우 모드","工作流模式","工作流程模式","modo de flujo de trabajo","modo de fluxo de trabalho","mode flux de travail","Workflow-Modus","iş akışı modu"],
+    "Oscar Film Mode": ["oscar","oscar mode","oscar film mode","film mode","オスカー映画モード","オスカーモード","오스카 영화 모드","奥斯卡电影模式","奧斯卡電影模式"],
+    "Copilot Mode": ["copilot","copilot mode","コパイロットモード","코파일럿 모드","副驾驶模式","协作模式"],
+    "MV Mode": ["mv","mv mode","music video mode","musicvideo","MVモード","MV 모드","MV模式","音乐视频模式"]
+  },
+  audience: {
+    "All Ages": ["all ages","all age","everyone","general","general audience","全年齢","全年齢対象","全年齢向け","전 연령","전체 이용가","全年龄","全年齡","所有年龄","老少皆宜","todas las edades","todas as idades","tous âges","alle Altersgruppen","tüm yaşlar"],
+    "Kids": ["kids","kid","children","child","kids content","for kids","子供","子ども","キッズ","어린이","아동","儿童","兒童","小孩","niños","crianças","enfants","Kinder","çocuklar"],
+    "Teenagers": ["teenagers","teenager","teens","teen","youth","young adult","ティーン","청소년","青少年","青年","adolescentes","Jugendliche","gençler"],
+    "Adults": ["adults","adult","grown ups","mature","大人","成人","성인","成年人","adultos","adultes","Erwachsene","yetişkinler"]
+  },
+  platform: {
+    "YouTube": ["youtube","you tube","yt","youtube long","ユーチューブ","유튜브","油管"],
+    "Shorts": ["shorts","short","short video","youtube shorts","vertical short","ショート","ショート動画","쇼츠","短视频","短視頻","cortos","vídeos curtos","Kurzvideos","kısa videolar"],
+    "Films": ["films","film","movie","movies","feature","long form","映画","영화","电影","電影","películas","filmes","Filme","filmler"],
+    "Ads": ["ads","ad","advertisement","advertising","commercial","cm","広告","광고","广告","廣告","anuncios","publicidade","Werbung","reklamlar"],
+    "TikTok": ["tiktok","tik tok","ティックトック","틱톡","抖音"],
+    "Instagram": ["instagram","ig","reels","instagram reels","インスタグラム","인스타그램"]
+  },
+  audio_mode: {
+    "Dialog": ["dialog","dialogue","dialog mode","conversation","default","ダイアログ","対話","セリフ","대화","对白","对话","對白","diálogo","dialogo","Dialoge","diyalog"],
+    "Voice Over": ["voice over","voiceover","voice_over","narration","narrator","vo","ナレーション","ボイスオーバー","내레이션","旁白","解说","解說","narración","narração","voix off","Erzähler","seslendirme"],
+    "Music Only": ["music only","music","bgm only","instrumental","no voice","bgm","音楽のみ","BGMのみ","음악만","纯音乐","純音樂","solo música","apenas música","musique seulement","nur Musik","sadece müzik"]
+  },
+  video_engine: {
+    "Seedance 2.0 Mini": ["seedance 2.0 mini","seedance2.0mini","seedance 2 mini","seedance20mini","doubao2mr2video"],
+    "Seedance 2.0 Fast": ["seedance 2.0 fast","seedance2.0fast","seedance 2 fast"],
+    "Seedance 2.0": ["seedance 2.0","seedance2.0","seedance 2"],
+    "Seedance 1.5 Pro": ["seedance 1.5 pro","seedance1.5pro"],
+    "Wan 3.0 Prime": ["wan 3.0 prime","wan3.0prime","wan 3 prime"],
+    "Wan 3.0": ["wan 3.0","wan3.0","wan 3"],
+    "Wan 2.7": ["wan 2.7","wan2.7","wanx 2.7"],
+    "MiniMax H3 2K": ["minimax h3 2k","minimaxh32k","hailuo h3 2k","h3 2k"],
+    "MiniMax H3": ["minimax h3","minimaxh3","hailuo h3","h3"],
+    "Kling O3": ["kling o3","klingo3","kling 03","可灵 o3"]
+  },
+  style: {
+    "User Provided Style": ["user provided style","user provided","custom style","customized style","user defined style","自定义风格","自訂風格","カスタムスタイル","사용자 지정 스타일","estilo personalizado","style personnalisé","özel stil","用户提供的风格"]
+  }
+};
+const _CANON_LOOKUP = {};
+Object.entries(CONFIG_CANON_ALIASES).forEach(([field, mapping]) => {
+  const rev = {};
+  Object.entries(mapping).forEach(([canon, aliases]) => {
+    rev[canonKey(canon)] = canon;
+    aliases.forEach(a => { rev[canonKey(a)] = canon; });
+  });
+  _CANON_LOOKUP[field] = rev;
+});
+
+const REALISTIC_STYLES = ["Sleek Simplicity","Realistic Atmosphere","Green Tint","Blurred Echo","Spotlight Fusion","Cosmic Vistas","Low-Angle Vibrance","CCD Retro","Fish-eye Lens","Studio Photography"];
+const REALISTIC_KEYS = new Set(REALISTIC_STYLES.map(canonKey));
+const REALISTIC_KW_RE = /realis[mt]|realisti|réalis|realist|photo|selfie|fotogra|fotoğraf|фото|реалист|live[\s_-]?action|写实|寫實|真人|实拍|實拍|写真|実写|フォトリアル|リアル|실사|사진/i;
+const REALISTIC_EX_RE = /anime|cartoon|toon|manga|comic|chibi|pixar|disney|ghibli|clay|pixel|illustrat|surreal|donghua|donghwa|动漫|動漫|动画|動畫|漫画|アニメ|マンガ|애니|만화|카툰/i;
+
+function getVisualType(style, styleCode) {
+  const s = isNullLike(style) ? "" : String(style).trim();
+  const c = isNullLike(styleCode) ? "" : String(styleCode).trim();
+  if (!s && !c) return "";
+  if ((s && (_CANON_LOOKUP.style[canonKey(s)] === "User Provided Style" || canonKey(s).includes("userprovided"))) ||
+      (c && canonKey(c).includes("userprovided"))) return "User Provided Style";
+  if (s && (REALISTIC_KEYS.has(canonKey(s)) || (REALISTIC_KW_RE.test(s.normalize("NFKC")) && !REALISTIC_EX_RE.test(s.normalize("NFKC"))))) return "写实类";
+  if (c && (REALISTIC_KEYS.has(canonKey(c)) || REALISTIC_STYLES.some(n => canonKey(c).includes(canonKey(n))))) return "写实类";
+  return "Animation";
+}
+
+/* Error Categories & Styling (aligned with anijam.py, with 403 URL bug fixed) */
+const ERR_CAT_STYLE = {
+  "内容审核 / 安全策略":      { bg: "#fff1f2", fg: "#be123c", bar: "#e11d48" },
+  "版权 / IP / 真人限制":    { bg: "#fdf2f8", fg: "#9d174d", bar: "#db2777" },
+  "参考素材 / 外部资源不可用": { bg: "#fff7ed", fg: "#9a3412", bar: "#ea580c" },
+  "参数 / Schema 校验失败":   { bg: "#faf5ff", fg: "#6b21a8", bar: "#9333ea" },
+  "生成审批流程拦截":        { bg: "#f0f9ff", fg: "#0369a1", bar: "#0284c7" },
+  "Agent 调用不可用 Tool":   { bg: "#eef2ff", fg: "#3730a3", bar: "#4f46e5" },
+  "数据不一致 / 目标不存在":  { bg: "#f0fdfa", fg: "#115e59", bar: "#0d9488" },
+  "权限 / 额度不足":          { bg: "#fefce8", fg: "#854d0e", bar: "#ca8a04" },
+  "登录态过期":              { bg: "#fefce8", fg: "#854d0e", bar: "#eab308" },
+  "超时":                    { bg: "#eff6ff", fg: "#1d4ed8", bar: "#2563eb" },
+  "服务容量 / 限流":          { bg: "#eff6ff", fg: "#1e40af", bar: "#3b82f6" },
+  "供应商 / 服务内部错误":    { bg: "#f1f5f9", fg: "#334155", bar: "#475569" },
+  "输入超出上限":            { bg: "#fff7ed", fg: "#c2410c", bar: "#f97316" },
+  "尺寸 / 分辨率 / 格式不支持":{ bg: "#f5f3ff", fg: "#5b21b6", bar: "#7c3aed" },
+  "生成失败 / 无结果":        { bg: "#fef2f2", fg: "#991b1b", bar: "#ef4444" },
+  "调用被取消":              { bg: "#fffbeb", fg: "#92400e", bar: "#d97706" },
+  "其他报错":                { bg: "#f1f5f9", fg: "#475569", bar: "#64748b" }
+};
+
+const REC_META = {
+  self:      { label: "🤖 Agent自愈",        cls: "rec-self",   bar: "#10b981" },
+  switch:    { label: "🔁 Agent自愈(换Tool)", cls: "rec-switch", bar: "#059669" },
+  user:      { label: "👤 用户介入后恢复",    cls: "rec-user",   bar: "#3b82f6" },
+  none:      { label: "🔴 未恢复",           cls: "rec-none",   bar: "#e11d48" },
+  cancelled: { label: "⚪ 已被取消",          cls: "rec-cxl",    bar: "#d97706" }
+};
+
+function classifyError(errText, isCancel) {
+  if (isCancel) return "调用被取消";
+  const t = String(errText || "").replace(/\bfetch\s+task\s+progress\s+failed\s*,?\s*(?:err(?:or)?\s*)?:\s*/i, "");
+  // 1. Check clear URL / media 403 / 404 BEFORE generic forbidden/permission
+  if (/(?:no\s+valid\s+(?:image|audio|video)\s+urls?|asset_urls\s+is\s+empty|image_url(?:s\[\d+\])?\s+is\s+empty|invalid\s+or\s+inaccessible|expired\s+url|failed\s+to\s+probe|failed\s+to\s+download|not\s+an\s+image,?\s+audio\s+or\s+video|http\s+error\s*\(4\d\d\))/i.test(t) ||
+      (/(?:url|http|download|fetch|image|audio|video|s3|cdn)/i.test(t) && /\b(?:403|404)\b|forbidden|access\s+denied/i.test(t))) {
+    return "参考素材 / 外部资源不可用";
+  }
+  if (/insufficient\s+credits?|not\s+enough\s+credits?|余额不足|积分不足|cr[ée]ditos?\s+insuficientes|yetersiz\s+kredi|クレジットが不足|크레딧이?\s*부족|\bno\s+privilege|无权限|没有权限|permission\s+denied|not\s+authorized|entitlement|upgrade\s+your\s+plan|do\s+not\s+have\s+access\s+to\s+the/i.test(t)) {
+    return "权限 / 额度不足";
+  }
+  if (/session\s+has\s+expired|please\s+log\s*in\s+again|登录已过期/i.test(t)) return "登录态过期";
+  if (/prepared\s+(?:batch|generation\s+record)/i.test(t)) return "生成审批流程拦截";
+  if (/copyright|trademark|intellectual\s+property|\bip\s+infringement|版权|著作权/i.test(t)) return "版权 / IP / 真人限制";
+  if (/moderation|content\s+review|content\s+policy|policy\s+violation|unsafe|inappropriate\s+content|data_inspection_failed|audit\s+not\s+passed|reference\s+audit|byte\s+audit|safety|审核|安全策略/i.test(t)) {
+    return "内容审核 / 安全策略";
+  }
+  if (/celebrity|public\s+figure|real\s+person|face\s+policy/i.test(t)) return "版权 / IP / 真人限制";
+  if (/is\s+not\s+a\s+valid\s+tool|\[skill\s+guard\]|is\s+blocked\s+because\s+current_skill|not\s+available\s+in\s+\w+\s+mode/i.test(t)) {
+    return "Agent 调用不可用 Tool";
+  }
+  if (/invalid\s+parameters?|field\s+required|validation\s+failed|section_validation_failed|schema|missing\s+required|write_todos\s+validation/i.test(t)) {
+    return "参数 / Schema 校验失败";
+  }
+  if (/not\s+found|no\s+\w+\s+data\s+found|no\s+matching\s+scenes|not\s+present\s+in\s+the\s+upstream\s+task\s+queue/i.test(t)) {
+    return "数据不一致 / 目标不存在";
+  }
+  if (/timeout|timed\s*out|deadline\s+exceeded|超时/i.test(t)) return "超时";
+  if (/rate\s*limit|too\s+many\s+requests|\b429\b|limit\s+of\s+\d+\s+batch|overloaded|concurrency|限流/i.test(t)) return "服务容量 / 限流";
+  if (/prompt\s+too\s+long|exceeds?\s+maximum|at\s+most\s+\d+\s+reference|duration\s+must\s+be\s+at\s+most|exceeds\s+the\s+model\s+limit/i.test(t)) return "输入超出上限";
+  if (/resolution|aspect\s*ratio|file\s+too\s+large|larger\s+than\s+\d+\s*mb|unsupported\s+(?:format|type|ratio)|corrupted\s+or\s+invalid/i.test(t)) return "尺寸 / 分辨率 / 格式不支持";
+  if (/internal\s+server\s+error|server\s+error|service\s+unavailable|(?:http|code|status)\D{0,8}\b5\d\d\b|json\s+parse\s+error|transfer\s+failed|nonetype|failed\s+to\s+combine|time\s*plan\s+error|task\s+commit\s+failed/i.test(t)) {
+    return "供应商 / 服务内部错误";
+  }
+  if (/processing\s+task\s+failed|generation\s+failed|task\s+failed|empty\s+result|no\s+result|no\s+output/i.test(t)) {
+    return "生成失败 / 无结果";
+  }
+  return "其他报错";
+}
+
+/* ============================================================================
+ * 2. 全局状态
+ * ========================================================================== */
+
+let STATE = {
+  sessions: [],
+  activeSessionIdx: -1,
+  onlyErrSessions: false,
+
+  pid: "", sid: "", uid: "",
+  config: null,
+  usedModels: [],
+  furthestStage: STAGE_UNKNOWN,
+  reachedStages: new Set(),
+  stageErrCounts: new Map(),
+
+  allItems: [],
+  filteredItems: [],
+  errors: [],           // 包含真实失败 + Agent自愈 + 被取消，严格时间正序
+  toolStats: new Map(),
+
+  selectedFidx: -1,
+  activeErrKey: "",
+  errOrder: "asc",
+  activeCat: "全部",
+  activeTool: "",
+  activeRec: "全部",
+  includeCxl: false,
+  followDay: false,
+
+  onlyErrCtx: false,
+  onlyErrCards: false,
+  showMedia: true,
+  hideConfirm: false,
+  showTrans: true,
+  godMode: false,
+  activeDay: "",
+
+  page: 1,
+  pageSize: 80,
+  searchQuery: "",
+  searchScope: "all",
+  searchHits: [],
+  hitPtr: -1,
+
+  transCache: {},
+  transToken: 0
+};
+
+try { STATE.transCache = JSON.parse(localStorage.getItem("anijam_trans_cache_v2") || "{}"); } catch (e) {}
+
+const DROPZONE_HTML = document.getElementById("chatStream").innerHTML;
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => { t.style.display = "none"; }, 2200);
+}
+
+function safeJsonParse(val) {
+  if (val && typeof val === "object") return val;
+  if (typeof val !== "string") return null;
+  const s = val.trim();
+  if (!s || (s[0] !== "{" && s[0] !== "[")) return null;
+  try { return JSON.parse(s); } catch (e) { return null; }
+}
+function prettyJson(val) {
+  if (val == null || val === "") return "";
+  if (typeof val === "object") return JSON.stringify(val, null, 2);
+  const p = safeJsonParse(val);
+  return p ? JSON.stringify(p, null, 2) : String(val);
+}
+function escHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+}
+
+/* ============================================================================
+ * 3. 会话配置提取（完整移植 anijam.py collect_initial_config）
+ * ========================================================================== */
+
+function unwrapModeState(ms) {
+  if (!ms || typeof ms !== "object") return null;
+  if (ms.mode_state && typeof ms.mode_state === "object") {
+    return Object.assign({}, ms, ms.mode_state);
+  }
+  return ms;
+}
+function firstNonempty(obj, keys) {
+  if (!obj || typeof obj !== "object") return "";
+  for (const k of keys) {
+    const v = obj[k];
+    if (v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && !v.length)) {
+      return String(v).replace(/\s+/g, " ").trim();
+    }
+  }
+  return "";
+}
+function parseConfigConfirmationText(text) {
+  const out = {};
+  if (!text) return out;
+  const pats = {
+    audience: /\bAudience\s*:\s*([^,\n]+)/i,
+    platform: /\bPlatform\s*:\s*([^,\n]+)/i,
+    aspect_ratio: /\bAspect\s*Ratio\s*:\s*([^,\n]+)/i,
+    audio_mode: /\bAudio\s*Mode\s*:\s*([^,\n]+)/i,
+    duration: /\bDuration\s*:\s*([^,\n]+)/i
+  };
+  for (const [k, re] of Object.entries(pats)) {
+    const m = text.match(re);
+    if (m) out[k] = m[1].replace(/\s+/g, " ").trim();
+  }
+  return out;
+}
+function extractStoryFieldsFromContent(obj) {
+  obj = safeJsonParse(obj);
+  if (!obj || typeof obj !== "object") return {};
+  const out = {};
+  const section = obj.section;
+  const items = Array.isArray(obj.items) ? obj.items : null;
+  const item = (items && items.length && typeof items[0] === "object") ? items[0] : null;
+  if (section === "story_outline" && item) {
+    const mapping = {
+      audience: ["audience"],
+      platform: ["platform"],
+      aspect_ratio: ["aspect_ratio"],
+      duration: ["duration", "duration_minutes"],
+      audio_mode: ["audio_mode"],
+      ai_mode: ["ai_mode_label", "ai_mode"],
+      video_engine: ["video_engine_label", "video_engine"]
+    };
+    for (const [dst, ks] of Object.entries(mapping)) {
+      const v = firstNonempty(item, ks);
+      if (v) out[dst] = v;
+    }
+    if (typeof item.document === "string") {
+      const tp = {
+        audience: /^\s*[-*]?\s*\*\*Audience:\*\*\s*([^\n]+)/im,
+        platform: /^\s*[-*]?\s*\*\*Platform:\*\*\s*([^\n]+)/im,
+        aspect_ratio: /^\s*[-*]?\s*\*\*Aspect Ratio:\*\*\s*([^\n]+)/im,
+        duration: /^\s*[-*]?\s*\*\*Duration:\*\*\s*([^\n]+)/im,
+        audio_mode: /^\s*[-*]?\s*\*\*Audio Mode:\*\*\s*([^\n]+)/im
+      };
+      for (const [dst, re] of Object.entries(tp)) {
+        if (!out[dst]) {
+          const m = item.document.match(re);
+          if (m) out[dst] = m[1].replace(/\\~/g, "~").replace(/\s+/g, " ").trim();
+        }
+      }
+    }
+  }
+  if (section === "mode_state" && item) {
+    out.ai_mode = firstNonempty(item, ["ai_mode_label", "ai_mode"]);
+    out.video_engine = firstNonempty(item, ["video_engine_label", "video_engine"]);
+    if (item.audio_mode) out.audio_mode = String(item.audio_mode).trim();
+  }
+  if (section === "art_inspiration" && item) {
+    if (item.style_name) out.style = String(item.style_name).trim();
+    if (item.style_code) out.style_code = String(item.style_code).trim();
+  }
+  return out;
+}
+function canonConfigValue(field, val) {
+  if (isNullLike(val)) return "";
+  const s = String(val).replace(/\s+/g, " ").trim();
+  if (field === "aspect_ratio") {
+    const m = s.match(/(\d{1,2})\s*[:x×*\/∶]\s*(\d{1,2})/);
+    if (m) return `${parseInt(m[1], 10)}:${parseInt(m[2], 10)}`;
+    return s;
+  }
+  if (field === "duration") {
+    if (/^\d+(?:\.\d+)?$/.test(s)) return `${parseFloat(s)} min`;
+    return s.replace(/\bmins?\b/gi, "min").replace(/\bminutes?\b/gi, "min");
+  }
+  const hit = _CANON_LOOKUP[field] && _CANON_LOOKUP[field][canonKey(s)];
+  return hit || s;
+}
+function extractRawAndDisplayText(r) {
+  const msg = (r && typeof r.message === "object") ? r.message : {};
+  const dm = (r && typeof r.display_message === "object") ? r.display_message : {};
+  const toTxt = c => {
+    if (!c) return "";
+    if (typeof c === "string") return c;
+    if (Array.isArray(c)) return c.map(x => (typeof x === "string" ? x : (x && x.text ? x.text : ""))).filter(Boolean).join("\n");
+    if (typeof c === "object" && c.text) return String(c.text);
+    return "";
+  };
+  return [toTxt(msg.content), toTxt(dm.content)];
+}
+function collectInitialConfig(rawList) {
+  const cfg = { ai_mode: "", video_engine: "", audience: "", platform: "", aspect_ratio: "", audio_mode: "", duration: "", style: "", style_code: "" };
+  const modeFb = {}, storyFb = {}, styleFb = {};
+
+  for (const r of rawList) {
+    if (!r || typeof r !== "object") continue;
+    const role = r.role;
+    const msg = (r.message && typeof r.message === "object") ? r.message : {};
+
+    const ms = unwrapModeState(msg.mode_state);
+    if (ms) {
+      const cm = firstNonempty(ms, ["ai_mode_label", "ai_mode"]);
+      const ce = firstNonempty(ms, ["video_engine_label", "video_engine"]);
+      const ca = firstNonempty(ms, ["audio_mode"]);
+      if (cm && !modeFb.ai_mode) modeFb.ai_mode = cm;
+      if (ce && !modeFb.video_engine) modeFb.video_engine = ce;
+      if (ca && !modeFb.audio_mode) modeFb.audio_mode = ca;
+      if (String(ms.source || "") === "user_confirm") {
+        if (cm && !cfg.ai_mode) cfg.ai_mode = cm;
+        if (ce && !cfg.video_engine) cfg.video_engine = ce;
+        if (ca && !cfg.audio_mode) cfg.audio_mode = ca;
+      }
+    }
+
+    if (role === "user") {
+      const [rawText, dispText] = extractRawAndDisplayText(r);
+      const confirmed = parseConfigConfirmationText(rawText);
+      if (Object.keys(confirmed).length >= 3) {
+        ["audience","platform","aspect_ratio","audio_mode","duration"].forEach(k => {
+          if (confirmed[k] && !cfg[k]) cfg[k] = confirmed[k];
+        });
+      }
+      if (!cfg.style && /\bstyle_code\s*:/i.test(rawText)) {
+        if (dispText) cfg.style = dispText.split("\n")[0].trim();
+        const m = rawText.match(/\bstyle_code\s*:\s*([^,\n]+)/i);
+        if (m && !cfg.style_code) cfg.style_code = m[1].trim();
+      }
+    }
+
+    const sec = extractStoryFieldsFromContent(msg.content);
+    ["audience","platform","aspect_ratio","audio_mode","duration","ai_mode","video_engine"].forEach(k => {
+      if (sec[k] && !storyFb[k]) storyFb[k] = sec[k];
+    });
+    ["style","style_code"].forEach(k => { if (sec[k] && !styleFb[k]) styleFb[k] = sec[k]; });
+
+    if (r.display_message && typeof r.display_message === "object") {
+      const sec2 = extractStoryFieldsFromContent(r.display_message.content);
+      ["audience","platform","aspect_ratio","audio_mode","duration"].forEach(k => {
+        if (sec2[k] && !storyFb[k]) storyFb[k] = sec2[k];
+      });
+    }
+  }
+
+  cfg.ai_mode = canonConfigValue("ai_mode", cfg.ai_mode || modeFb.ai_mode || storyFb.ai_mode);
+  cfg.video_engine = canonConfigValue("video_engine", cfg.video_engine || modeFb.video_engine || storyFb.video_engine);
+  ["audience","platform","aspect_ratio","duration"].forEach(k => {
+    cfg[k] = canonConfigValue(k, cfg[k] || storyFb[k]);
+  });
+  cfg.audio_mode = canonConfigValue("audio_mode", cfg.audio_mode || modeFb.audio_mode || storyFb.audio_mode);
+  cfg.style = canonConfigValue("style", cfg.style || styleFb.style);
+  cfg.style_code = cfg.style_code || styleFb.style_code || "";
+  cfg.visual_type = getVisualType(cfg.style, cfg.style_code);
+  return cfg;
+}
+
+/* ============================================================================
+ * 4. 完整制作阶段判定引擎（移植 anijam.py stage_walk P1 / P1.5 / P2 / P3 / P4 / P5）
+ * ========================================================================== */
+
+function plNormPhase(p) { return String(p || "").trim().toLowerCase().replace(/-/g, "_"); }
+function registryStage(tool) {
+  const r = TOOL_REGISTRY[String(tool || "").trim().toLowerCase()];
+  if (!r) return [false, ""];
+  return [true, (r.kind === "生产" || r.kind === "流程") ? r.stage : ""];
+}
+function plPhaseFromTool(name) {
+  const n = String(name || "").toLowerCase();
+  for (const [re, phase] of PL_TOOL_FALLBACK) {
+    if (re.test(n)) return phase;
+  }
+  return "";
+}
+function computeStageWalk(rawList, callArgsMap) {
+  const out = [];
+  let cur = "", curSrc = "", curSig = "";
+  let furthestRank = -1;
+  let todoFurthest = null;
+
+  for (const r of rawList) {
+    const body = (r && typeof r.message === "object") ? r.message : {};
+    const tcs = Array.isArray(body.tool_calls) ? body.tool_calls : [];
+    const resName = r.role === "tool"
+      ? String(body.name || (callArgsMap.get(body.tool_call_id || "") || {}).name || "")
+      : "";
+
+    let p = "", level = "", sig = "";
+
+    // P1: 生产 / 流程类 Tool
+    const names = [];
+    if (r.role === "tool" && resName) names.push(resName);
+    tcs.forEach(tc => { if (tc && tc.function && tc.function.name) names.push(String(tc.function.name)); });
+    for (let k = names.length - 1; k >= 0; k--) {
+      const n = names[k];
+      const [reg, regSt] = registryStage(n);
+      if (reg) {
+        if (regSt) { p = REGISTRY_STAGE_PHASE[regSt]; level = "P1"; sig = n; break; }
+        continue;
+      }
+      if (PL_PRODUCTION_RE.test(n) && !UNREG_CONTROL_RE.test(n)) {
+        const fp = plPhaseFromTool(n);
+        if (fp) { p = fp; level = "P1"; sig = n; break; }
+      }
+    }
+
+    // P1.5: choose_skill
+    if (!level) {
+      const pickSkill = blob => {
+        const o = safeJsonParse(blob);
+        if (o && o.skill_name) return plNormPhase(o.skill_name);
+        const s = typeof blob === "string" ? blob : JSON.stringify(blob || "");
+        const m = s.match(/"skill_name"\s*:\s*"([^"]+)"/);
+        return m ? plNormPhase(m[1]) : "";
+      };
+      if (r.role === "tool" && resName === "choose_skill") {
+        const sp = pickSkill(body.content);
+        if (sp && PL_PHASE2GROUP[sp]) { p = sp; level = "P1.5"; sig = `choose_skill:${sp}`; }
+      } else {
+        for (const tc of tcs) {
+          if (tc && tc.function && tc.function.name === "choose_skill") {
+            const sp = pickSkill(tc.function.arguments);
+            if (sp && PL_PHASE2GROUP[sp]) { p = sp; level = "P1.5"; sig = `choose_skill:${sp}`; break; }
+          }
+        }
+      }
+    }
+
+    // P2: section / source_section / target_section / phase_id
+    if (!level) {
+      const isWriteTodoOrRead =
+        tcs.some(tc => tc && tc.function && (tc.function.name === "write_todos" || String(tc.function.name || "").startsWith("read_"))) ||
+        (r.role === "tool" && (resName.startsWith("write_todos") || resName.startsWith("read_")));
+      if (!isWriteTodoOrRead) {
+        const blob = typeof body.content === "string" ? body.content : JSON.stringify(body || "");
+        let lastHit = "";
+        PL_SECTION_KEY_RE.lastIndex = 0;
+        let m;
+        while ((m = PL_SECTION_KEY_RE.exec(blob)) !== null) {
+          const np = plNormPhase(m[2]);
+          if (PL_PHASE2GROUP[np]) lastHit = np;
+        }
+        if (lastHit) { p = lastHit; level = "P2"; sig = `section:${lastHit}`; }
+      }
+    }
+
+    // P3: write_todos in_progress
+    if (!level) {
+      for (const tc of tcs) {
+        if (tc && tc.function && tc.function.name === "write_todos") {
+          const o = safeJsonParse(tc.function.arguments);
+          const todos = o && Array.isArray(o.todos) ? o.todos : [];
+          const ip = todos.filter(t => t && t.status === "in_progress");
+          if (ip.length) {
+            const tp = plNormPhase(ip[ip.length - 1].phase_id);
+            if (tp && PL_PHASE2GROUP[tp]) {
+              p = tp; level = "P3"; sig = `write_todos:${tp}`;
+              todoFurthest = PL_PHASE2GROUP[tp];
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (level && p && PL_PHASE2GROUP[p]) {
+      cur = p; curSrc = level; curSig = sig;
+    } else if (cur) {
+      level = "P4"; sig = `继承自 ${curSrc}:${curSig}`;
+    } else {
+      level = "P5"; sig = "";
+    }
+
+    const stage = PL_PHASE2GROUP[cur] || STAGE_UNKNOWN;
+    if (level === "P1") {
+      const rk = STAGE_ORDER.indexOf(stage);
+      if (rk > furthestRank) furthestRank = rk;
+    }
+    out.push({ stage, level, basis: STAGE_LEVEL_LABELS[level] || level, signal: sig });
+  }
+
+  let furthestStage = furthestRank >= 0 ? STAGE_ORDER[furthestRank] : (todoFurthest || STAGE_STORY);
+  return { walk: out, furthestStage };
+}
+
+/* ============================================================================
+ * 5. 对话与报错解析（含 anijam.py 风格 Agent 自愈判定，修复 Bug #2 & #3）
+ * ========================================================================== */
+
+function getToolMedia(tn) {
+  const n = String(tn || "").toLowerCase();
+  if (TOOL_REGISTRY[n]) return TOOL_REGISTRY[n].media || "";
+  if (n.includes("video") || /seedance|minimax|hailuo|kling|wan/.test(n)) return "video";
+  if (n.includes("image") || n.includes("concept")) return "image";
+  if (/bgm|audio|music|narrat|speech|voice/.test(n)) return "audio";
+  return "";
+}
+function getToolStageSimple(tn) {
+  const [reg, st] = registryStage(tn);
+  if (reg) return st;
+  const fp = plPhaseFromTool(tn);
+  return PL_PHASE2GROUP[fp] || "";
+}
+function extractUnitKeys(obj) {
+  const keys = new Set();
+  if (!obj || typeof obj !== "object") return keys;
+  ["card_id","item_id","shot_id","concept_id","asset_id","character_id","location_id","prop_id"].forEach(k => {
+    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== "") keys.add(`${k}=${obj[k]}`);
+  });
+  if (obj.scene != null && obj.scene !== "" && obj.seq_id != null && obj.seq_id !== "") {
+    keys.add(`scene=${String(obj.scene).trim()}|seq_id=${obj.seq_id}`);
+  }
+  return keys;
+}
+function extractCallUnitKeys(argsObj, parsedRes) {
+  const keys = new Set();
+  if (argsObj && typeof argsObj === "object") {
+    extractUnitKeys(argsObj).forEach(k => keys.add(k));
+    if (Array.isArray(argsObj.tasks)) {
+      argsObj.tasks.forEach(t => extractUnitKeys(t).forEach(k => keys.add(k)));
+    }
+  }
+  if (parsedRes && typeof parsedRes === "object" && Array.isArray(parsedRes.gen_results)) {
+    parsedRes.gen_results.forEach(g => extractUnitKeys(g).forEach(k => keys.add(k)));
+  }
+  return keys;
+}
+
+const PASSIVE_CONFIRM_RE = /^(?:confirm\s+(?:generate|regenerate|edit)\b|process\s+the\s+structured\s+generation\s+approval\s+decision\b)/i;
+
+function parseAnijamJson(doc, fallbackName = "") {
+  let rawList = Array.isArray(doc) ? doc : (doc.data || doc.records || doc.messages || []);
+  const pid = String(doc.pid || doc.project_id || "");
+  const sid = String(doc.sid || fallbackName.replace(/\.json$/i, "") || "");
+  const uid = String(doc.userid || doc.user_id || doc.uid || "");
+
+  // Reverse first if descending, then stable sort chronologically (aligned with anijam.py)
+  rawList = rawList.filter(r => r && typeof r === "object" && !r.is_deleted);
+  if (rawList.length >= 2 && (rawList[0].timestamp || "") > (rawList[rawList.length - 1].timestamp || "")) {
+    rawList = rawList.slice().reverse();
+  }
+  rawList = rawList.slice().sort((a, b) => {
+    const ta = a.timestamp || "", tb = b.timestamp || "";
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    return (a.id || 0) - (b.id || 0);
+  });
+
+  // 1. Collect call_id -> { name, args, tsMs }
+  const callArgsMap = new Map();
+  for (const r of rawList) {
+    if (r.role === "assistant") {
+      const msg = r.message || {};
+      const tcs = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
+      const tsMs = r.timestamp ? Date.parse(r.timestamp) : NaN;
+      for (const tc of tcs) {
+        const cid = tc.id || "";
+        const fn = tc.function || {};
+        if (cid && !callArgsMap.has(cid)) {
+          callArgsMap.set(cid, {
+            name: fn.name || "",
+            args: fn.arguments != null ? fn.arguments : "",
+            tsMs: isNaN(tsMs) ? null : tsMs
+          });
+        }
+      }
+    }
+  }
+
+  // 2. Config + Stage walk
+  const config = collectInitialConfig(rawList);
+  const { walk: stageWalkArr, furthestStage } = computeStageWalk(rawList, callArgsMap);
+
+  // 3. Build items
+  const items = [];
+  const toolStats = new Map();
+  const seenToolSig = new Set();
+  const usedModelsSet = new Set();
+  let lastUserTs = null;
+  let lastUserText = "";
+
+  const bumpTool = (tn, kind) => {
+    if (!tn) return;
+    if (!toolStats.has(tn)) toolStats.set(tn, { total: 0, failed: 0, healed: 0, cancelled: 0 });
+    const st = toolStats.get(tn);
+    st.total++;
+    if (kind === "failed") st.failed++;
+    else if (kind === "cancelled") st.cancelled++;
+  };
+
+  for (let ri = 0; ri < rawList.length; ri++) {
+    const r = rawList[ri];
+    const stInfo = stageWalkArr[ri] || { stage: STAGE_UNKNOWN, level: "P5", basis: "P5 未识别", signal: "" };
+    const role = r.role || "";
+    const mid = r.message_id || String(r.id || "");
+    const tsRaw = r.timestamp || "";
+    const ts = tsRaw ? tsRaw.slice(0, 19).replace("T", " ") : "";
+    const tsMs = tsRaw ? Date.parse(tsRaw) : NaN;
+    const msg = r.message || {};
+    const dm = r.display_message || {};
+
+    if (role === "user") {
+      let texts = [], imgs = [];
+      const dmC = dm && Array.isArray(dm.content) ? dm.content : null;
+      if (dmC && dmC.length) {
+        for (const it of dmC) {
+          if (it && it.type === "text" && it.text) texts.push(it.text.trim());
+          else if (it && it.type === "image_url" && it.image_url && it.image_url.url) imgs.push(it.image_url.url);
+        }
+      }
+      if (!texts.length) {
+        const mc = msg.content;
+        if (Array.isArray(mc)) {
+          for (const it of mc) {
+            if (it && it.type === "text" && it.text) {
+              let t = it.text.trim();
+              const mImg = t.match(/,?\s*images:\[(.*?)\]/);
+              if (mImg) {
+                if (!imgs.length) imgs = mImg[1].split(",").map(s => s.trim()).filter(Boolean);
+                t = t.slice(0, mImg.index).trim();
+              }
+              if (t) texts.push(t);
+            }
+          }
+        } else if (typeof mc === "string" && mc.trim()) {
+          texts.push(mc.trim());
+        }
+      }
+      const uTxt = texts.join(" ").trim();
+      lastUserTs = isNaN(tsMs) ? null : tsMs;
+      if (uTxt) lastUserText = uTxt;
+      items.push({
+        r: "u", id: mid, ts, day: ts.slice(0, 10), t: uTxt, imgs,
+        stage: stInfo.stage, stageLevel: stInfo.level, stageBasis: stInfo.basis, stageSignal: stInfo.signal
+      });
+    }
+    else if (role === "assistant") {
+      const txt = (typeof msg.content === "string" ? msg.content : "").trim();
+      const rc = ((msg.additional_kwargs || {}).reasoning_content || "").trim();
+      const tcs = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
+      const calls = tcs.map(tc => {
+        const fn = tc.function || {};
+        return { id: tc.id || "", n: fn.name || "", a: typeof fn.arguments === "string" ? fn.arguments : JSON.stringify(fn.arguments || "", null, 2) };
+      });
+      if (txt || rc || calls.length) {
+        items.push({
+          r: "a", id: mid, ts, day: ts.slice(0, 10), t: txt, rc, tc: calls,
+          stage: stInfo.stage, stageLevel: stInfo.level, stageBasis: stInfo.basis, stageSignal: stInfo.signal
+        });
+      }
+    }
+    else if (role === "tool") {
+      const cid = msg.tool_call_id || "";
+      const matchedCall = cid ? callArgsMap.get(cid) : null;
+      const tn = msg.name || (matchedCall ? matchedCall.name : "") || "unknown_tool";
+      const rawC = msg.content;
+      const rawStr = typeof rawC === "string" ? rawC : JSON.stringify(rawC ?? "");
+
+      if (cid) {
+        const sig = cid + "::" + rawStr.slice(0, 400) + "::" + rawStr.length;
+        if (seenToolSig.has(sig)) continue;
+        seenToolSig.add(sig);
+      }
+
+      const parsed = safeJsonParse(rawC);
+      const argsObj = matchedCall ? safeJsonParse(matchedCall.args) : null;
+      const startMs = (matchedCall && matchedCall.tsMs) ? matchedCall.tsMs : lastUserTs;
+      const ws = (startMs && !isNaN(tsMs) && tsMs >= startMs && (tsMs - startMs) < 3600000)
+        ? Math.round((tsMs - startMs) / 1000) : null;
+
+      if (parsed && typeof parsed === "object" && (parsed.model_name || parsed.video_model_name || parsed.engine)) {
+        const mLabel = canonConfigValue("video_engine", parsed.video_model_name || parsed.model_name || parsed.engine);
+        if (mLabel && getToolMedia(tn) === "video") usedModelsSet.add(mLabel);
+      }
+
+      // Detect error / partial failure / cancellation
+      let isCancel = false;
+      const errMsgs = [];
+      let totalBatch = 0, failBatch = 0;
+
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const st = String(parsed.status || "").toLowerCase();
+        const code = parsed.code;
+        const badCode = code !== undefined && code !== null && code !== 0 && code !== "0" && code !== 200 && code !== "200";
+        const errField = String(parsed.err || parsed.error || parsed.message || "");
+        if (st === "cancelled" || st === "canceled" || /prepared\s+batch[\s\S]{0,250}?was\s+rejected\s+by\s+the\s+user/i.test(errField)) {
+          isCancel = true;
+          errMsgs.push(errField || "Tool call cancelled");
+        } else {
+          if (st === "failed" || st === "error" || badCode || parsed.err || parsed.error) {
+            const em = parsed.err || parsed.error || parsed.message || `status=${st}, code=${code}`;
+            errMsgs.push(typeof em === "string" ? em : JSON.stringify(em));
+          }
+          if (Array.isArray(parsed.gen_results)) {
+            totalBatch = parsed.gen_results.length;
+            parsed.gen_results.forEach((g, gi) => {
+              if (!g || typeof g !== "object") return;
+              const gst = String(g.status || "").toLowerCase();
+              const gcode = g.code;
+              const gbad = gcode !== undefined && gcode !== null && gcode !== 0 && gcode !== "0" && gcode !== 200 && gcode !== "200";
+              if (gst === "failed" || gst === "error" || gbad || g.err || g.error) {
+                failBatch++;
+                const gem = g.err || g.error || g.message || `gen_results[${gi}] status=${gst}`;
+                const gemStr = typeof gem === "string" ? gem : JSON.stringify(gem);
+                if (!errMsgs.includes(gemStr)) errMsgs.push(gemStr);
+              }
+            });
+          }
+        }
+      } else if (typeof rawC === "string") {
+        const low = rawC.toLowerCase();
+        if (low.includes("was cancelled") || /prepared\s+batch[\s\S]{0,250}?was\s+rejected\s+by\s+the\s+user/i.test(rawC)) {
+          isCancel = true;
+          errMsgs.push(rawC.trim());
+        } else if (/^\s*(?:error|exception|traceback|blocked)\b|is\s+not\s+a\s+valid\s+tool|\[skill\s+guard\]|invalid\s+parameters|processing\s+task\s+failed|task\s+commit\s+failed|fetch\s+task\s+progress\s+failed|internal\s+server\s+error|insufficient\s+credits|permission\s+denied|403\s+forbidden|no\s+valid\s+image\s+urls/i.test(rawC)) {
+          errMsgs.push(rawC.trim());
+        }
+      }
+
+      const unitKeys = extractCallUnitKeys(argsObj, parsed);
+      const tMedia = getToolMedia(tn);
+      const tStage = getToolStageSimple(tn);
+
+      if (errMsgs.length) {
+        bumpTool(tn, isCancel ? "cancelled" : "failed");
+        const fullErr = errMsgs.join("\n---\n");
+        const cat = classifyError(fullErr, isCancel);
+        const mn = (parsed && (parsed.video_model_name || parsed.image_model_name || parsed.model_name || parsed.engine)) || tn;
+        const bt = (parsed && parsed.billing_text) || "";
+        const partialInfo = (totalBatch > 1 && failBatch > 0 && failBatch < totalBatch) ? `局部失败 ${failBatch}/${totalBatch}` : "";
+        items.push({
+          r: "e",
+          key: `err_${items.length}_${cid || mid}`,
+          id: mid, cid, ts, day: ts.slice(0, 10), ws,
+          tn, mn, bt, tMedia, tStage, unitKeys,
+          isCancel,
+          isInvalidTool: /is\s+not\s+a\s+valid\s+tool/i.test(fullErr),
+          cat,
+          err: fullErr,
+          partial: partialInfo,
+          args: matchedCall ? matchedCall.args : "",
+          raw: rawStr,
+          uCtx: lastUserText,
+          rec: isCancel ? "cancelled" : "none",
+          recTool: "",
+          recTs: "",
+          stage: stInfo.stage, stageLevel: stInfo.level, stageBasis: stInfo.basis, stageSignal: stInfo.signal
+        });
+        if (parsed && Array.isArray(parsed.gen_results)) {
+          const okMedia = parsed.gen_results.filter(g => g && (g.video || g.image)).map(g => ({ st: g.status || "success", v: g.video || "", i: g.image || "" }));
+          if (okMedia.length) {
+            items.push({
+              r: "m", id: mid, ts, day: ts.slice(0, 10), ws, tn, tMedia, tStage, unitKeys, mn, bt, ms: okMedia,
+              stage: stInfo.stage, stageLevel: stInfo.level, stageBasis: stInfo.basis, stageSignal: stInfo.signal
+            });
+          }
+        }
+        continue;
+      }
+
+      bumpTool(tn, "ok");
+
+      if (["show_next_steps","show_next_events","show_credit_estimate","show_next_episode"].includes(tn) && parsed && typeof parsed === "object") {
+        items.push({
+          r: "c", id: mid, ts, day: ts.slice(0, 10), tn, tMedia, tStage, unitKeys,
+          c: {
+            ct: parsed.card_type || tn, ti: parsed.title || "",
+            op: Array.isArray(parsed.options) ? parsed.options : [],
+            ri: parsed.recommend_idx ?? 0, am: parsed.addition_message || "",
+            et: parsed.estimated_total, rs: parsed.reason || ""
+          },
+          stage: stInfo.stage, stageLevel: stInfo.level, stageBasis: stInfo.basis, stageSignal: stInfo.signal
+        });
+      }
+      else if (parsed && typeof parsed === "object" && (parsed.gen_results || parsed.video || parsed.edited_video || parsed.image)) {
+        const media = [];
+        for (const g of (parsed.gen_results || [])) {
+          if (g && (g.video || g.image)) media.push({ st: g.status || "success", v: g.video || "", i: g.image || "" });
+        }
+        if (!media.length && parsed.video) media.push({ st: parsed.status || "success", v: parsed.video, i: "" });
+        if (parsed.edited_video) media.push({ st: parsed.status || "success", v: parsed.edited_video, i: "" });
+        if (!media.length && parsed.image) media.push({ st: parsed.status || "success", v: "", i: parsed.image });
+        if (media.length) {
+          items.push({
+            r: "m", id: mid, ts, day: ts.slice(0, 10), ws, tn, tMedia, tStage, unitKeys,
+            mn: parsed.video_model_name || parsed.image_model_name || parsed.model_name || parsed.engine || tn,
+            bt: parsed.billing_text || "", ms: media,
+            stage: stInfo.stage, stageLevel: stInfo.level, stageBasis: stInfo.basis, stageSignal: stInfo.signal
+          });
+        }
+      }
+      else {
+        items.push({
+          r: "g", id: mid, cid, ts, day: ts.slice(0, 10), tn, tMedia, tStage, unitKeys, t: rawStr.slice(0, 1200),
+          stage: stInfo.stage, stageLevel: stInfo.level, stageBasis: stInfo.basis, stageSignal: stInfo.signal
+        });
+      }
+    }
+  }
+
+  // 4. Recovery判定（区分 Agent自愈 / 换Tool自愈 / 用户介入后恢复 / 未恢复）
+  const hasOverlap = (s1, s2) => {
+    if (!s1 || !s1.size || !s2 || !s2.size) return false;
+    for (const k of s1) if (s2.has(k)) return true;
+    return false;
+  };
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (it.r !== "e" || it.isCancel) continue;
+    let userIntervened = false;
+    let sameHit = null, switchHit = null;
+
+    for (let j = i + 1; j < items.length; j++) {
+      const nx = items[j];
+      if (nx.r === "u" && nx.t) {
+        // Pure confirm clicks don't count as user intervention (aligned with anijam.py passive confirm)
+        if (!PASSIVE_CONFIRM_RE.test(nx.t.trim())) userIntervened = true;
+        continue;
+      }
+      if (nx.r !== "m" && nx.r !== "g" && nx.r !== "c") continue;
+
+      if (it.isInvalidTool && !userIntervened && !switchHit) {
+        switchHit = { nx, userIntervened: false };
+        break;
+      }
+      if (!sameHit && nx.tn === it.tn) {
+        if (!it.unitKeys.size || !nx.unitKeys.size || hasOverlap(it.unitKeys, nx.unitKeys)) {
+          sameHit = { nx, userIntervened };
+        }
+      }
+      if (!switchHit && nx.tn !== it.tn && it.tStage && it.tMedia && nx.tStage === it.tStage && nx.tMedia === it.tMedia) {
+        if (!it.unitKeys.size || !nx.unitKeys.size || hasOverlap(it.unitKeys, nx.unitKeys)) {
+          switchHit = { nx, userIntervened };
+        }
+      }
+      if (sameHit && switchHit) break;
+    }
+
+    if (sameHit && !sameHit.userIntervened) {
+      it.rec = "self"; it.recTool = sameHit.nx.tn; it.recTs = sameHit.nx.ts || "";
+    } else if (switchHit && !switchHit.userIntervened) {
+      it.rec = "switch"; it.recTool = switchHit.nx.tn; it.recTs = switchHit.nx.ts || "";
+    } else {
+      const pick = (sameHit && switchHit)
+        ? (items.indexOf(sameHit.nx) <= items.indexOf(switchHit.nx) ? sameHit : switchHit)
+        : (sameHit || switchHit);
+      if (pick) {
+        it.rec = "user"; it.recTool = pick.nx.tn; it.recTs = pick.nx.ts || "";
+      } else {
+        it.rec = "none";
+      }
+    }
+
+    // Move Agent自愈 out of toolStats.failed into toolStats.healed so failure counts match real failures
+    if (it.rec === "self" || it.rec === "switch") {
+      const tsObj = toolStats.get(it.tn);
+      if (tsObj && tsObj.failed > 0) { tsObj.failed--; tsObj.healed++; }
+    }
+  }
+
+  const errors = items.filter(it => it.r === "e");
+  const reachedStages = new Set();
+  const stageErrCounts = new Map();
+  items.forEach(it => {
+    if (it.stage && it.stage !== STAGE_UNKNOWN) reachedStages.add(it.stage);
+    if (it.r === "e" && !it.isCancel && it.rec !== "self" && it.rec !== "switch") {
+      stageErrCounts.set(it.stage, (stageErrCounts.get(it.stage) || 0) + 1);
+    }
+  });
+
+  return {
+    pid, sid, uid, config,
+    usedModels: Array.from(usedModelsSet),
+    furthestStage, reachedStages, stageErrCounts,
+    items, errors, toolStats
+  };
+}
+
+/* Built-in pure-JS ZIP reader */
+async function readZipJsonFiles(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  const bytes = new Uint8Array(arrayBuffer);
+  const dec = new TextDecoder("utf-8");
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65558); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd === -1) throw new Error("无效的 ZIP 文件（未找到目录尾）");
+  const totalEntries = view.getUint16(eocd + 10, true);
+  let ptr = view.getUint32(eocd + 16, true);
+  const results = [];
+  for (let n = 0; n < totalEntries; n++) {
+    if (view.getUint32(ptr, true) !== 0x02014b50) break;
+    const method = view.getUint16(ptr + 10, true);
+    const compSize = view.getUint32(ptr + 20, true);
+    const nameLen = view.getUint16(ptr + 28, true);
+    const extraLen = view.getUint16(ptr + 30, true);
+    const cmtLen = view.getUint16(ptr + 32, true);
+    const localOffset = view.getUint32(ptr + 42, true);
+    const name = dec.decode(bytes.subarray(ptr + 46, ptr + 46 + nameLen));
+    ptr += 46 + nameLen + extraLen + cmtLen;
+    if (!name.toLowerCase().endsWith(".json") || name.includes("__MACOSX/") || name.split("/").pop().startsWith("._")) continue;
+    const lNameLen = view.getUint16(localOffset + 26, true);
+    const lExtraLen = view.getUint16(localOffset + 28, true);
+    const dataStart = localOffset + 30 + lNameLen + lExtraLen;
+    const compData = bytes.subarray(dataStart, dataStart + compSize);
+    let text = "";
+    if (method === 0) text = dec.decode(compData);
+    else if (method === 8) {
+      const ds = new DecompressionStream("deflate-raw");
+      text = await new Response(new Blob([compData]).stream().pipeThrough(ds)).text();
+    } else continue;
+    results.push({ name: name.split("/").pop(), text });
+  }
+  return results;
+}
+
+/* ============================================================================
+ * 6. 自动翻译引擎（用户原话 + Agent 回复统一自动翻译、并发队列 + 本地缓存）
+ * ========================================================================== */
+
+function needsChineseTranslation(str) {
+  const s = String(str || "").trim();
+  if (!s || s.length < 2) return false;
+  // Pure emoji / punctuation / numbers
+  if (!/[A-Za-z\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u0E00-\u0E7F]/.test(s)) return false;
+  const zhCnt = (s.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const nonWs = s.replace(/\s+/g, "").length;
+  if (zhCnt >= 6 && zhCnt / Math.max(1, nonWs) >= 0.28) return false;
+  return true;
+}
+
+function normTransKey(text) {
+  return String(text || "").trim().replace(/\s+/g, " ").slice(0, 1800);
+}
+
+function getCachedTranslation(text) {
+  if (!text) return "";
+  const k = normTransKey(text);
+  if (STATE.transCache[k]) return STATE.transCache[k];
+  const low = k.toLowerCase();
+  let m;
+  if ((m = low.match(/^confirm generate (\d+) items?$/))) return `确认生成 ${m[1]} 项`;
+  if ((m = low.match(/^confirm regenerate (\d+) items?$/))) return `确认重新生成 ${m[1]} 项`;
+  if ((m = low.match(/^confirm edit \(~?(\d+) credits\)$/))) return `确认编辑（约 ${m[1]} 积分）`;
+  if (low === "regenerate") return "重新生成";
+  if (low === "cancel") return "取消";
+  if (low === "continue the previous plot") return "接着之前的剧情往下拍";
+  return "";
+}
+
+function saveTransCache(raw, zh) {
+  if (!zh) return;
+  const k = normTransKey(raw);
+  STATE.transCache[k] = zh;
+  // Cap cache size to keep localStorage fast
+  const keys = Object.keys(STATE.transCache);
+  if (keys.length > 2500) {
+    keys.slice(0, 400).forEach(old => delete STATE.transCache[old]);
+  }
+  try { localStorage.setItem("anijam_trans_cache_v2", JSON.stringify(STATE.transCache)); } catch (e) {}
+}
+
+async function translateSingleChunk(chunk) {
+  // Primary: Google Translate GTX
+  try {
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&q=${encodeURIComponent(chunk)}`);
+    if (r.ok) {
+      const j = await r.json();
+      const out = (j && Array.isArray(j[0]) ? j[0] : []).map(x => x && x[0] ? x[0] : "").join("");
+      if (out) return out;
+    }
+  } catch (e) {}
+  // Fallback: MyMemory (for shorter texts)
+  if (chunk.length <= 480) {
+    try {
+      const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=en|zh-CN`);
+      if (r.ok) {
+        const j = await r.json();
+        const out = j && j.responseData && j.responseData.translatedText;
+        if (out && !/MYMEMORY WARNING/i.test(out)) return out;
+      }
+    } catch (e) {}
+  }
+  return "";
+}
+
+async function fetchTranslateZh(text) {
+  const cached = getCachedTranslation(text);
+  if (cached) return cached;
+  // Strip simple markdown emphasis for cleaner translation while preserving line breaks
+  const clean = String(text || "").replace(/\*\*/g, "").trim();
+  if (clean.length <= 1400) {
+    const out = await translateSingleChunk(clean);
+    if (out) saveTransCache(text, out);
+    return out;
+  }
+  // Split long Agent replies into chunks of <= 1200 chars at newline boundaries
+  const lines = clean.split("\n");
+  const chunks = [];
+  let buf = "";
+  for (const ln of lines) {
+    if ((buf + "\n" + ln).length > 1200 && buf) { chunks.push(buf); buf = ln; }
+    else buf = buf ? (buf + "\n" + ln) : ln;
+  }
+  if (buf) chunks.push(buf);
+  const translated = [];
+  for (const ch of chunks.slice(0, 4)) {
+    const res = await translateSingleChunk(ch);
+    if (!res) return "";
+    translated.push(res);
+  }
+  const joined = translated.join("\n");
+  if (joined) saveTransCache(text, joined);
+  return joined;
+}
+
+async function autoTranslateVisiblePage() {
+  const token = ++STATE.transToken;
+  const retryBtn = document.getElementById("btnRetransPage");
+  if (!STATE.showTrans) { retryBtn.style.display = "none"; return; }
+  const nodes = Array.from(document.querySelectorAll(".zh-text.pending"));
+  if (!nodes.length) {
+    retryBtn.style.display = "none";
+    return;
+  }
+  if (!navigator.onLine) {
+    nodes.forEach(el => { el.textContent = "（当前离线，联网后点击重试或双击手动填写）"; });
+    retryBtn.style.display = "inline-flex";
+    return;
+  }
+
+  let done = 0, failed = 0, cursor = 0;
+  const total = nodes.length;
+  const hint = document.getElementById("statusHint");
+  const prevHint = hint.textContent;
+  const updateHint = () => {
+    if (STATE.transToken !== token) return;
+    hint.textContent = `🌐 自动翻译本页中 ${done}/${total}...`;
+  };
+  updateHint();
+
+  const worker = async () => {
+    while (cursor < total && STATE.transToken === token) {
+      const idx = cursor++;
+      const el = nodes[idx];
+      const raw = el.dataset.raw || "";
+      const zh = await fetchTranslateZh(raw);
+      if (STATE.transToken !== token) return;
+      done++;
+      if (zh) {
+        el.innerHTML = hlText(zh);
+        el.classList.remove("pending");
+      } else {
+        failed++;
+        el.textContent = "（翻译超时，点击重试或双击编辑）";
+      }
+      updateHint();
+    }
+  };
+
+  const concurrency = Math.min(4, total);
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  if (STATE.transToken === token) {
+    hint.textContent = failed ? `⚠️ 翻译完成（${total - failed}/${total}，${failed} 条失败）` : `✅ 本页原话与回复已自动翻译完成`;
+    retryBtn.style.display = failed ? "inline-flex" : "none";
+    if (!failed) setTimeout(() => { if (STATE.transToken === token && prevHint) hint.textContent = prevHint; }, 2200);
+  }
+}
+
+async function singleTranslate(el) {
+  el.textContent = "翻译中...";
+  const zh = await fetchTranslateZh(el.dataset.raw || "");
+  if (zh) { el.innerHTML = hlText(zh); el.classList.remove("pending"); }
+  else el.textContent = "（翻译失败，点击重试或双击手动输入）";
+}
+
+function editTransInline(el) {
+  const raw = el.dataset.raw || "";
+  const cur = el.classList.contains("pending") ? "" : el.textContent;
+  const val = prompt("手动修改该条消息的中文翻译（自动保存到本地）：", cur);
+  if (val !== null && val.trim()) {
+    saveTransCache(raw, val.trim());
+    el.innerHTML = hlText(val.trim());
+    el.classList.remove("pending");
+  }
+}
+
+/* ============================================================================
+ * 7. 报错筛选、对话渲染、阶段联动与配置栏
+ * ========================================================================== */
+
+function isSelfHealed(e) { return e && (e.rec === "self" || e.rec === "switch"); }
+
+// 报错时间轴：不包含 Agent 自愈（Requirement #4）
+function getTimelineErrors() {
+  let list = STATE.errors.filter(e => {
+    if (isSelfHealed(e)) return false;
+    if (!STATE.includeCxl && e.isCancel) return false;
+    if (STATE.activeCat !== "全部" && e.cat !== STATE.activeCat) return false;
+    if (STATE.activeTool && e.tn !== STATE.activeTool) return false;
+    if (STATE.activeRec !== "全部" && e.rec !== STATE.activeRec) return false;
+    if (STATE.followDay && STATE.activeDay && e.day !== STATE.activeDay) return false;
+    return true;
+  });
+  if (STATE.errOrder === "desc") list = list.slice().reverse();
+  return list;
+}
+
+function applyFilters(keepPage = false) {
+  const base = STATE.allItems.filter(it => {
+    if (STATE.activeDay && it.day !== STATE.activeDay) return false;
+    if (it.r === "e") {
+      if (isSelfHealed(it)) {
+        if (STATE.onlyErrCards || STATE.onlyErrCtx) return false;
+        return STATE.godMode; // 平时不打扰，全量细节开启时以紧凑绿条展示
+      }
+      if (!STATE.includeCxl && it.isCancel) return false;
+      if (STATE.activeTool && it.tn !== STATE.activeTool) return false;
+      return true;
+    }
+    if (STATE.onlyErrCards) return false;
+    if (STATE.hideConfirm && it.r === "u" && /^confirm (?:generate|regenerate)/i.test(it.t || "")) return false;
+    if (!STATE.showMedia && it.r === "m") return false;
+    if (!STATE.godMode && it.r === "g") return false;
+    if (!STATE.godMode && it.r === "a" && !it.t) return false;
+    return true;
+  });
+
+  if (STATE.onlyErrCtx && !STATE.onlyErrCards) {
+    const keepIdx = new Set();
+    base.forEach((it, idx) => {
+      if (it.r === "e" && !isSelfHealed(it)) {
+        for (let k = Math.max(0, idx - 2); k <= Math.min(base.length - 1, idx + 2); k++) keepIdx.add(k);
+      }
+    });
+    const out = [];
+    let prevK = -1;
+    Array.from(keepIdx).sort((a, b) => a - b).forEach(k => {
+      if (prevK !== -1 && k - prevK > 1) out.push({ r: "gap", skipped: k - prevK - 1, day: base[k].day });
+      out.push(base[k]);
+      prevK = k;
+    });
+    STATE.filteredItems = out;
+  } else {
+    STATE.filteredItems = base;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(STATE.filteredItems.length / STATE.pageSize));
+  if (!keepPage) STATE.page = 1;
+  if (STATE.page > totalPages) STATE.page = totalPages;
+
+  runSearch(false);
+  renderChat(true);
+  renderErrSidebar();
+  // Sync stage bar to first visible item on current page if none selected
+  const start = (STATE.page - 1) * STATE.pageSize;
+  const firstItem = STATE.filteredItems.slice(start, start + STATE.pageSize).find(x => x.r !== "gap");
+  if (firstItem) syncStageBarToItem(firstItem, start);
+}
+
+function renderConfigBar() {
+  const bar = document.getElementById("configBar");
+  const strip = document.getElementById("configStrip");
+  if (!STATE.allItems.length) { bar.classList.remove("show"); return; }
+  bar.classList.add("show");
+  const c = STATE.config || {};
+  const fields = [
+    ["创作模式", c.ai_mode, true],
+    ["视频引擎", c.video_engine, true],
+    ["受众", c.audience, false],
+    ["平台", c.platform, false],
+    ["画幅", c.aspect_ratio, false],
+    ["音频模式", c.audio_mode, false],
+    ["时长", c.duration, false],
+    ["风格", c.style, false]
+  ].filter(x => x[1]);
+
+  if (!fields.length) {
+    const modelsHtml = STATE.usedModels.length
+      ? `<span class="cfg-dot">·</span><span class="cfg-chip primary" title="会话中实际调用的视频模型">实测模型：${escHtml(STATE.usedModels.join(" / "))}</span>`
+      : "";
+    strip.innerHTML = `<span class="cfg-chip" style="color:var(--text-2);">未选预设配置（自由对话 / 直接生成）</span>${modelsHtml}`;
+    return;
+  }
+
+  const parts = [];
+  fields.forEach(([label, val, isPrimary], i) => {
+    if (i > 0) parts.push(`<span class="cfg-dot">·</span>`);
+    parts.push(`<span class="cfg-chip ${isPrimary ? "primary" : ""}" title="${escHtml(label)}">${escHtml(val)}</span>`);
+  });
+  if (c.visual_type) {
+    parts.push(`<span class="cfg-chip visual" title="画面类型（基于风格自动识别）">${escHtml(c.visual_type)}</span>`);
+  }
+  strip.innerHTML = parts.join("");
+}
+
+function getConfigCopyString() {
+  const c = STATE.config || {};
+  const vals = [c.ai_mode, c.video_engine, c.audience, c.platform, c.aspect_ratio, c.audio_mode, c.duration, c.style].filter(Boolean);
+  if (vals.length) return vals.join(" · ");
+  return STATE.usedModels.length ? `未选预设配置 · 实测模型：${STATE.usedModels.join(" / ")}` : "未选预设配置";
+}
+
+function renderStageBar(activeStage = "", activeBasis = "", activeSignal = "") {
+  const bar = document.getElementById("stageBar");
+  if (!STATE.allItems.length) { bar.classList.remove("show"); return; }
+  bar.classList.add("show");
+
+  const st = activeStage || STATE.furthestStage || STAGE_UNKNOWN;
+  const badge = document.getElementById("curStageBadge");
+  badge.textContent = st;
+  badge.className = "stage-active-badge" + (st === STAGE_UNKNOWN ? " unknown" : "");
+
+  const basisEl = document.getElementById("curStageBasis");
+  const basisTxt = activeBasis ? `${activeBasis}${activeSignal ? " · " + activeSignal : ""}` : "点击下方任意消息同步查看当前制作阶段";
+  basisEl.textContent = basisTxt;
+  basisEl.title = basisTxt;
+
+  document.getElementById("furthestStageHint").innerHTML =
+    `<span>最远到达：<b>${escHtml(STATE.furthestStage || STAGE_UNKNOWN)}</b></span>`;
+
+  // Show core 6 stages + any non-core branch stages reached in this session
+  const displayStages = STAGE_ORDER.filter(s => CORE_STAGES.has(s) || STATE.reachedStages.has(s) || s === st);
+  const stepsEl = document.getElementById("stageSteps");
+  stepsEl.innerHTML = displayStages.map((s, i) => {
+    const reached = STATE.reachedStages.has(s);
+    const isCur = s === st;
+    const errCnt = STATE.stageErrCounts.get(s) || 0;
+    const arrow = i > 0 ? `<span class="stage-arrow">→</span>` : "";
+    return `${arrow}<div class="stage-step ${reached ? "reached" : ""} ${isCur ? "current" : ""}" ${reached ? `onclick="jumpToStage('${escHtml(s)}')"` : ""} title="${reached ? `点击跳转到「${escHtml(s)}」阶段第一条记录` : "本会话未进入该阶段"}${errCnt ? `（真实报错 ${errCnt} 次）` : ""}">
+      <span class="s-dot"></span>
+      <span>${escHtml(s)}</span>
+      ${errCnt ? `<span class="s-err-dot" title="${errCnt} 次真实报错"></span>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function syncStageBarToItem(it, fidx = -1) {
+  if (!it || it.r === "gap") return;
+  if (fidx >= 0) {
+    STATE.selectedFidx = fidx;
+    document.querySelectorAll(".msg-row.selected").forEach(el => el.classList.remove("selected"));
+    const rowEl = document.querySelector(`.msg-row[data-fidx="${fidx}"]`);
+    if (rowEl) rowEl.classList.add("selected");
+  }
+  renderStageBar(it.stage, it.stageBasis, it.stageSignal);
+}
+
+function selectMessageRow(fidx, ev) {
+  // Don't hijack link/button/summary/video clicks
+  if (ev && ev.target && ev.target.closest("a, button, summary, video, img, input, select")) return;
+  const it = STATE.filteredItems[fidx];
+  if (it && it.r !== "gap") syncStageBarToItem(it, fidx);
+}
+
+function jumpToStage(stageName) {
+  let idx = STATE.filteredItems.findIndex(it => it.r !== "gap" && it.stage === stageName);
+  if (idx === -1) {
+    STATE.activeDay = ""; STATE.onlyErrCards = false; STATE.onlyErrCtx = false;
+    document.getElementById("pillOnlyErr").classList.remove("on");
+    document.getElementById("pillErrCtx").classList.remove("on");
+    renderDayList(false);
+    applyFilters(false);
+    idx = STATE.filteredItems.findIndex(it => it.r !== "gap" && it.stage === stageName);
+  }
+  if (idx !== -1) {
+    jumpToFilteredIndex(idx);
+    showToast(`已定位到「${stageName}」阶段起点`);
+  }
+}
+
+/* Search & Navigation */
+function runSearch(jumpFirst = true) {
+  const q = STATE.searchQuery.trim().toLowerCase();
+  STATE.searchHits = [];
+  STATE.hitPtr = -1;
+  if (q) {
+    STATE.filteredItems.forEach((it, idx) => {
+      if (it.r === "gap") return;
+      if (STATE.searchScope === "user" && it.r !== "u") return;
+      if (STATE.searchScope === "err" && it.r !== "e") return;
+      const hay = [
+        it.t || "", it.id || "", it.cid || "", it.tn || "", it.mn || "",
+        it.err || "", it.cat || "", it.args || "", it.stage || "",
+        (it.r === "u" || it.r === "a") ? (getCachedTranslation(it.t) || "") : "",
+        it.r === "c" ? ((it.c.ti || "") + " " + (it.c.op || []).map(o => typeof o === "object" ? (o.title || "") : o).join(" ")) : ""
+      ].join(" ").toLowerCase();
+      if (hay.includes(q)) STATE.searchHits.push(idx);
+    });
+  }
+  updateSearchUI();
+  if (jumpFirst && STATE.searchHits.length) jumpToHit(0);
+  else renderChat(true);
+}
+function updateSearchUI() {
+  const total = STATE.searchHits.length;
+  const cur = total ? (STATE.hitPtr + 1) : 0;
+  document.getElementById("searchCount").textContent = `${cur}/${total}`;
+}
+function jumpToHit(ptr) {
+  if (!STATE.searchHits.length) return;
+  const n = STATE.searchHits.length;
+  STATE.hitPtr = ((ptr % n) + n) % n;
+  updateSearchUI();
+  jumpToFilteredIndex(STATE.searchHits[STATE.hitPtr]);
+}
+function jumpToFilteredIndex(itemIdx) {
+  const targetPage = Math.floor(itemIdx / STATE.pageSize) + 1;
+  const pageChanged = (STATE.page !== targetPage);
+  if (pageChanged) {
+    STATE.page = targetPage;
+    renderChat(false);
+    renderErrSidebar();
+  }
+  const it = STATE.filteredItems[itemIdx];
+  requestAnimationFrame(() => {
+    if (it) syncStageBarToItem(it, itemIdx);
+    const el = document.querySelector(`[data-fidx="${itemIdx}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: pageChanged ? "auto" : "smooth", block: "center" });
+      el.classList.remove("pulse");
+      void el.offsetWidth;
+      el.classList.add("pulse");
+    }
+  });
+}
+function jumpToErrKey(errKey, scrollCardIntoView = false) {
+  STATE.activeErrKey = errKey;
+  let idx = STATE.filteredItems.findIndex(it => it.r === "e" && it.key === errKey);
+  if (idx === -1) {
+    const target = STATE.errors.find(e => e.key === errKey);
+    if (target && target.isCancel && !STATE.includeCxl) {
+      STATE.includeCxl = true;
+      document.getElementById("chkIncludeCxl").checked = true;
+      document.getElementById("pillShowCxl").classList.add("on");
+    }
+    STATE.activeDay = "";
+    STATE.activeTool = "";
+    renderDayList(false);
+    renderToolBreakdown();
+    applyFilters(false);
+    idx = STATE.filteredItems.findIndex(it => it.r === "e" && it.key === errKey);
+  }
+  if (idx !== -1) {
+    jumpToFilteredIndex(idx);
+    highlightErrCard(errKey, scrollCardIntoView);
+  }
+}
+function highlightErrCard(errKey, shouldScroll = true) {
+  STATE.activeErrKey = errKey;
+  document.querySelectorAll(".tl-card").forEach(el => {
+    const on = el.dataset.ekey === errKey;
+    el.classList.toggle("active", on);
+    if (on && shouldScroll) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+}
+function stepErr(delta) {
+  const list = getTimelineErrors();
+  if (!list.length) return;
+  const curIdx = list.findIndex(e => e.key === STATE.activeErrKey);
+  const nextIdx = curIdx === -1 ? (delta > 0 ? 0 : list.length - 1) : (curIdx + delta + list.length) % list.length;
+  jumpToErrKey(list[nextIdx].key, true);
+}
+function getErrPageInfo(errKey) {
+  const fidx = STATE.filteredItems.findIndex(it => it.r === "e" && it.key === errKey);
+  if (fidx === -1) return null;
+  return { fidx, page: Math.floor(fidx / STATE.pageSize) + 1 };
+}
+
+function hlText(s) {
+  let safe = escHtml(s);
+  const q = STATE.searchQuery.trim();
+  if (!q) return safe;
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  return safe.replace(re, m => `<mark class="hl">${m}</mark>`);
+}
+function fmtMd(s) {
+  return hlText(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\*(.+?)\*/g, "<i>$1</i>").replace(/\n/g, "<br/>");
+}
+function fmtWait(sec) {
+  if (sec == null) return "";
+  if (sec < 60) return `⏱ ${sec}s`;
+  return `⏱ ${Math.floor(sec / 60)}m${sec % 60}s`;
+}
+function copyText(t, msg = "已复制到剪贴板") {
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => showToast(msg));
+}
+
+function buildTransBlock(rawText) {
+  if (!STATE.showTrans || !needsChineseTranslation(rawText)) return "";
+  const zh = getCachedTranslation(rawText);
+  return `
+    <div class="zh-trans">
+      <span class="zh-badge">译</span>
+      <span class="zh-text ${zh ? "" : "pending"}" data-raw="${escHtml(rawText)}" title="单击重试翻译 / 双击手动修改"
+        onclick="if(this.classList.contains('pending')) singleTranslate(this)"
+        ondblclick="editTransInline(this)">${zh ? hlText(zh) : "自动翻译中..."}</span>
+    </div>`;
+}
+
+function renderChat(resetScroll = true) {
+  const box = document.getElementById("chatStream");
+  if (!STATE.allItems.length) return;
+
+  const totalPages = Math.max(1, Math.ceil(STATE.filteredItems.length / STATE.pageSize));
+  document.getElementById("totalPages").textContent = totalPages;
+  document.getElementById("pageInput").value = STATE.page;
+
+  const start = (STATE.page - 1) * STATE.pageSize;
+  const slice = STATE.filteredItems.slice(start, start + STATE.pageSize);
+
+  if (!slice.length) {
+    box.innerHTML = `<div style="text-align:center;color:var(--muted);margin-top:80px;font-size:13px;">当前筛选条件下暂无记录（可能本会话无非自愈报错或被筛选隐藏），可调整左侧快捷视图。</div>`;
+    return;
+  }
+
+  let html = "", prevDay = "", prevStage = "";
+  slice.forEach((it, localIdx) => {
+    const fidx = start + localIdx;
+    if (it.r === "gap") {
+      html += `<div class="ctx-gap">省略中间 ${it.skipped} 条正常对话记录</div>`;
+      return;
+    }
+    if (it.day && it.day !== prevDay) {
+      prevDay = it.day;
+      html += `<div class="date-divider"><span>📅 ${escHtml(it.day)}</span></div>`;
+    }
+    if (it.stage && it.stage !== STAGE_UNKNOWN && it.stage !== prevStage) {
+      prevStage = it.stage;
+      html += `<div class="stage-divider"><span>🎬 阶段：${escHtml(it.stage)}${it.stageLevel && it.stageLevel !== "P4" ? ` · ${escHtml(it.stageBasis)}` : ""}</span></div>`;
+    }
+    const selCls = fidx === STATE.selectedFidx ? "selected" : "";
+
+    if (it.r === "u") {
+      html += `
+      <div class="msg-row user ${selCls}" data-fidx="${fidx}" onclick="selectMessageRow(${fidx}, event)">
+        <div class="avatar user">用</div>
+        <div class="bubble-wrap">
+          <div class="msg-meta">
+            <span class="stage-mini">${escHtml(it.stage)}</span>
+            <span class="mid-tag" title="点击复制 message_id" onclick="copyText('${escHtml(it.id)}','已复制 message_id')">${escHtml(it.id.slice(0,8))}</span>
+            <span>${escHtml((it.ts || "").slice(11))}</span>
+          </div>
+          <div class="bubble">
+            <div>${it.t ? hlText(it.t) : "<i style='opacity:.65'>[仅图片消息]</i>"}</div>
+            ${buildTransBlock(it.t)}
+            ${(it.imgs && it.imgs.length) ? `
+              <div class="ref-imgs">
+                ${it.imgs.map(u => `<img src="${escHtml(u)}" loading="lazy" onclick="openLightbox('${escHtml(u)}')" title="点击放大查看参考图"/>`).join("")}
+              </div>` : ""}
+          </div>
+        </div>
+      </div>`;
+    }
+    else if (it.r === "a") {
+      html += `
+      <div class="msg-row agent ${selCls}" data-fidx="${fidx}" onclick="selectMessageRow(${fidx}, event)">
+        <div class="avatar agent">AI</div>
+        <div class="bubble-wrap">
+          <div class="msg-meta">
+            <b>Annie</b>
+            <span>${escHtml((it.ts || "").slice(11))}</span>
+            <span class="stage-mini">${escHtml(it.stage)}</span>
+          </div>
+          ${it.t ? `<div class="bubble"><div>${fmtMd(it.t)}</div>${buildTransBlock(it.t)}</div>` : ""}
+          ${it.rc ? `<details class="god-box god-only"><summary>🧠 AI 内部思考 (reasoning_content)</summary><pre>${escHtml(it.rc)}</pre></details>` : ""}
+          ${(it.tc && it.tc.length) ? it.tc.map(tc => `
+            <details class="god-box god-only"><summary>⚙️ 发起工具调用：${escHtml(tc.n)}</summary><pre>${escHtml(prettyJson(tc.a))}</pre></details>
+          `).join("") : ""}
+        </div>
+      </div>`;
+    }
+    else if (it.r === "e") {
+      const seqNum = STATE.errors.indexOf(it) + 1;
+      const cs = ERR_CAT_STYLE[it.cat] || ERR_CAT_STYLE["其他报错"];
+      const rm = REC_META[it.rec] || REC_META.none;
+      const prettyArgs = prettyJson(it.args);
+      const prettyRaw = prettyJson(it.raw);
+
+      if (isSelfHealed(it)) {
+        html += `
+        <div class="msg-row agent god-only ${selCls}" data-fidx="${fidx}" onclick="selectMessageRow(${fidx}, event)">
+          <div class="avatar heal">✓</div>
+          <div class="bubble-wrap" style="max-width:88%;">
+            <details class="heal-details">
+              <summary>
+                <span>${rm.label}</span>
+                <span style="font-family:var(--font-mono);">${escHtml(it.tn)}</span>
+                <span class="cat-badge" style="background:${cs.bg};color:${cs.fg};">${escHtml(it.cat)}</span>
+                <span style="font-weight:400;color:var(--text-2);">${escHtml((it.ts || "").slice(11))}${it.recTs ? ` → ${escHtml(it.recTs.slice(11))} 恢复` : ""}</span>
+              </summary>
+              <div class="heal-details-body">
+                <div class="err-raw" style="margin-bottom:6px;">${hlText(it.err)}</div>
+                ${prettyArgs ? `<details class="err-details"><summary>📥 调用入参</summary><pre>${hlText(prettyArgs)}</pre></details>` : ""}
+              </div>
+            </details>
+          </div>
+        </div>`;
+      } else {
+        html += `
+        <div class="msg-row agent ${selCls}" data-fidx="${fidx}" data-ekey="${escHtml(it.key)}" onclick="selectMessageRow(${fidx}, event)">
+          <div class="avatar ${it.isCancel ? "cancel" : "err"}">${it.isCancel ? "⏹" : "!"}</div>
+          <div class="bubble-wrap" style="max-width:90%;">
+            <div class="msg-meta">
+              <b style="color:${it.isCancel ? "var(--warn)" : "var(--danger)"};">${it.isCancel ? "工具调用被取消" : "工具报错"}</b>
+              <span>${escHtml((it.ts || "").slice(11))}</span>
+              <span class="stage-mini">${escHtml(it.stage)}</span>
+              ${it.ws != null ? `<span class="wait-tag">${fmtWait(it.ws)}</span>` : ""}
+              ${it.cid ? `<span class="mid-tag" title="点击复制 tool_call_id" onclick="copyText('${escHtml(it.cid)}','已复制 call_id')">${escHtml(it.cid.slice(0,16))}</span>` : ""}
+            </div>
+            <div class="err-card ${it.isCancel ? "cancelled" : ""}">
+              <div class="err-head">
+                <div class="err-head-left">
+                  <span class="err-seq">#${seqNum}</span>
+                  <span class="err-tool">${hlText(it.tn)}</span>
+                  ${it.mn && it.mn !== it.tn ? `<span class="err-model">${hlText(it.mn)}</span>` : ""}
+                  ${it.partial ? `<span class="cat-badge" style="background:var(--warn-soft);color:#92400e;">${escHtml(it.partial)}</span>` : ""}
+                </div>
+                <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+                  <span class="cat-badge" style="background:${cs.bg};color:${cs.fg};">${escHtml(it.cat)}</span>
+                  <span class="rec-badge ${rm.cls}" title="${it.recTs ? "恢复时间：" + escHtml(it.recTs) : ""}">${rm.label}</span>
+                </div>
+              </div>
+              <div class="err-body">
+                <div class="err-raw">${hlText(it.err)}</div>
+                <div class="err-actions">
+                  <span style="font-size:11px;color:var(--text-2);">
+                    ${it.bt ? `计费：${escHtml(it.bt)}` : ""}
+                    ${it.recTs ? ` ｜ 恢复于 ${escHtml(it.recTs.slice(5,19))}` : ""}
+                  </span>
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn btn-xs" onclick="copyText(STATE.errors[${seqNum-1}].err, '已复制报错原文')">📋 复制报错</button>
+                    <button class="btn btn-xs" onclick="highlightErrCard('${escHtml(it.key)}', true)">右侧高亮 →</button>
+                  </div>
+                </div>
+                ${prettyArgs ? `<details class="err-details"><summary>📥 调用入参 (Tool Arguments — 自动关联 call_id)</summary><pre>${hlText(prettyArgs)}</pre></details>` : ""}
+                <details class="err-details"><summary>📦 原始返回体 (Raw Tool Response)</summary><pre>${hlText(prettyRaw)}</pre></details>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }
+    }
+    else if (it.r === "m") {
+      html += `
+      <div class="msg-row agent ${selCls}" data-fidx="${fidx}" onclick="selectMessageRow(${fidx}, event)">
+        <div class="avatar agent">🎬</div>
+        <div class="bubble-wrap">
+          <div class="msg-meta">
+            <b>工具成功出片 (${escHtml(it.tn)})</b>
+            <span>${escHtml((it.ts || "").slice(11))}</span>
+            <span class="stage-mini">${escHtml(it.stage)}</span>
+            ${it.ws != null ? `<span class="wait-tag">${fmtWait(it.ws)}</span>` : ""}
+          </div>
+          ${it.ms.map(m => `
+            <div class="media-card">
+              <div class="media-head">
+                <span class="model">${escHtml(it.mn)}</span>
+                <span style="color:#4ade80;">● ${escHtml(m.st)}</span>
+              </div>
+              <div class="media-body">
+                ${m.v ? `<video controls preload="none" playsinline src="${escHtml(m.v)}"></video>` : ""}
+                ${(!m.v && m.i) ? `<img src="${escHtml(m.i)}" loading="lazy" onclick="openLightbox('${escHtml(m.i)}')" />` : ""}
+              </div>
+              <div class="media-foot">
+                <span style="color:#fbbf24;">${escHtml(it.bt || "")}</span>
+                <a href="${escHtml(m.v || m.i)}" target="_blank" rel="noopener">新窗口打开 ↗</a>
+              </div>
+            </div>`).join("")}
+        </div>
+      </div>`;
+    }
+    else if (it.r === "c") {
+      const c = it.c;
+      const isCredit = c.ct === "credit_estimate";
+      const cardText = [c.ti, ...(c.op || []).map(o => typeof o === "object" ? (o.title || "") : o)].filter(Boolean).join(" / ");
+      html += `
+      <div class="msg-row agent ${selCls}" data-fidx="${fidx}" onclick="selectMessageRow(${fidx}, event)">
+        <div class="avatar agent">${isCredit ? "💰" : "🧩"}</div>
+        <div class="bubble-wrap">
+          <div class="msg-meta">
+            <b>交互卡片 (${escHtml(c.ct)})</b>
+            <span>${escHtml((it.ts || "").slice(11))}</span>
+            <span class="stage-mini">${escHtml(it.stage)}</span>
+          </div>
+          <div class="ui-card ${isCredit ? "credit" : ""}">
+            <div class="ui-card-title">${hlText(c.ti || (isCredit ? "积分提示" : "选项卡片"))}</div>
+            ${isCredit && c.et != null ? `<div style="font-size:12px;color:#b45309;margin-bottom:6px;">预计消耗：<b>${c.et}</b> 积分 ｜ ${escHtml(c.rs)}</div>` : ""}
+            ${c.op && c.op.length ? `<div class="ui-card-opts">
+              ${c.op.map((o, oi) => `<div class="ui-opt ${oi === c.ri ? "rec" : ""}"><span>${hlText(typeof o === "object" ? (o.title || JSON.stringify(o)) : o)}</span>${oi === c.ri ? "<span>★</span>" : ""}</div>`).join("")}
+            </div>` : ""}
+            ${buildTransBlock(cardText)}
+          </div>
+        </div>
+      </div>`;
+    }
+    else if (it.r === "g") {
+      html += `
+      <div class="msg-row agent god-only ${selCls}" data-fidx="${fidx}" onclick="selectMessageRow(${fidx}, event)">
+        <div class="avatar tool">🔧</div>
+        <div class="bubble-wrap">
+          <details class="god-box"><summary>✅ 正常工具返回：${escHtml(it.tn)} (${escHtml((it.ts || "").slice(11))}) · ${escHtml(it.stage)}</summary><pre>${escHtml(prettyJson(it.t))}</pre></details>
+        </div>
+      </div>`;
+    }
+  });
+
+  box.innerHTML = html;
+  if (resetScroll) box.scrollTop = 0;
+
+  // Automatically translate all visible pending User + Agent + Card messages!
+  autoTranslateVisiblePage();
+}
+
+/* ============================================================================
+ * 8. 左侧统计 / 右侧报错时间轴 / 归类统计（含 Agent 自愈）
+ * ========================================================================== */
+
+function renderStatsOverview() {
+  const realErr = STATE.errors.filter(e => !e.isCancel && !isSelfHealed(e)).length;
+  const healed = STATE.errors.filter(e => isSelfHealed(e)).length;
+  const cxl = STATE.errors.filter(e => e.isCancel).length;
+  let totalTools = 0;
+  STATE.toolStats.forEach(v => { totalTools += v.total; });
+  const effTotal = Math.max(0, totalTools - cxl);
+  const rate = effTotal ? ((effTotal - realErr) / effTotal * 100).toFixed(1) + "%" : "100%";
+
+  const badge = document.getElementById("pidBadge");
+  badge.textContent = (STATE.pid ? `PID ${STATE.pid}` : "已加载") + ` · ${realErr} 报错`;
+  badge.className = "status-pill " + (realErr > 0 ? "err" : "ok");
+  document.getElementById("uidText").textContent = STATE.sid ? `SID ${STATE.sid.slice(0,10)}…` : "";
+
+  document.getElementById("stErr").textContent = realErr.toLocaleString();
+  document.getElementById("stHeal").textContent = healed.toLocaleString();
+  document.getElementById("stCxl").textContent = cxl.toLocaleString();
+  document.getElementById("stToolAllSub").textContent = `共${totalTools.toLocaleString()}次`;
+  document.getElementById("stRate").textContent = rate;
+}
+
+function renderToolBreakdown() {
+  const el = document.getElementById("toolBreakdown");
+  document.getElementById("toolReset").style.display = STATE.activeTool ? "inline" : "none";
+  const rows = [];
+  STATE.toolStats.forEach((st, tn) => {
+    const cnt = STATE.includeCxl ? (st.failed + st.cancelled) : st.failed;
+    if (cnt > 0) rows.push({ tn, failed: st.failed, healed: st.healed, cxl: st.cancelled, total: st.total, cnt });
+  });
+  rows.sort((a, b) => b.cnt - a.cnt);
+  if (!rows.length) {
+    el.innerHTML = `<div style="color:var(--ok);font-size:12px;padding:4px 2px;">✅ 当前无非自愈报错工具</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(r => `
+    <div class="tool-row ${STATE.activeTool === r.tn ? "active" : ""}" onclick="toggleToolFilter('${escHtml(r.tn)}')" title="${escHtml(r.tn)}（真实失败 ${r.failed} / 自愈 ${r.healed} / 取消 ${r.cxl} / 总调用 ${r.total}）">
+      <span class="tname">${escHtml(r.tn)}</span>
+      <span class="cnt err">${r.failed}/${r.total}</span>
+    </div>`).join("");
+}
+
+function toggleToolFilter(tn) {
+  STATE.activeTool = (STATE.activeTool === tn) ? "" : tn;
+  renderToolBreakdown();
+  applyFilters(false);
+}
+
+let cachedDayMap = new Map();
+function renderDayList(rebuild = false) {
+  if (rebuild) {
+    cachedDayMap = new Map();
+    STATE.allItems.forEach(x => {
+      if (!x.day) return;
+      if (!cachedDayMap.has(x.day)) cachedDayMap.set(x.day, { u: 0, err: 0, cxl: 0 });
+      const d = cachedDayMap.get(x.day);
+      if (x.r === "u") d.u++;
+      else if (x.r === "e" && !isSelfHealed(x)) {
+        if (x.isCancel) d.cxl++; else d.err++;
+      }
+    });
+  }
+  const el = document.getElementById("dayList");
+  document.getElementById("dayReset").style.display = STATE.activeDay ? "inline" : "none";
+  if (!cachedDayMap.size) { el.innerHTML = ""; return; }
+  let h = "", i = 0;
+  for (const [day, d] of cachedDayMap.entries()) {
+    i++;
+    h += `<div class="day-item ${STATE.activeDay === day ? "active" : ""}" onclick="selectDay('${day}')">
+      <span>Day ${i} · ${day}</span>
+      <span style="display:flex;gap:4px;align-items:center;">
+        ${d.err ? `<span class="cnt err">❌${d.err}</span>` : ""}
+        ${(STATE.includeCxl && d.cxl) ? `<span class="cnt warn">⏹${d.cxl}</span>` : ""}
+        <span class="cnt">${d.u}句</span>
+      </span>
+    </div>`;
+  }
+  el.innerHTML = h;
+}
+function selectDay(day) {
+  STATE.activeDay = (STATE.activeDay === day) ? "" : day;
+  renderDayList(false);
+  applyFilters(false);
+}
+
+function renderErrSidebar() {
+  // Timeline excludes Agent自愈
+  const baseErrs = STATE.errors.filter(e => !isSelfHealed(e) && (STATE.includeCxl || !e.isCancel));
+  const healedCount = STATE.errors.filter(e => isSelfHealed(e)).length;
+
+  const healBar = document.getElementById("healHintBar");
+  if (healedCount > 0) {
+    healBar.classList.add("show");
+    document.getElementById("healHintText").textContent = `🤖 已隐藏 ${healedCount} 条 Agent 自愈报错`;
+  } else {
+    healBar.classList.remove("show");
+  }
+
+  const catCounts = new Map();
+  baseErrs.forEach(e => catCounts.set(e.cat, (catCounts.get(e.cat) || 0) + 1));
+  const sel = document.getElementById("catFilterSel");
+  const cats = ["全部", ...Array.from(catCounts.keys())];
+  sel.innerHTML = cats.map(c => {
+    const label = c === "全部" ? `全部分类 (${baseErrs.length})` : `${c} (${catCounts.get(c)})`;
+    return `<option value="${escHtml(c)}" ${STATE.activeCat === c ? "selected" : ""}>${escHtml(label)}</option>`;
+  }).join("");
+
+  document.getElementById("btnToggleErrOrder").textContent =
+    STATE.errOrder === "asc" ? "🕒 时间正序（最早→最晚）" : "🕒 时间倒序（最晚→最早）";
+
+  const list = getTimelineErrors();
+  document.getElementById("tabErrCnt").textContent = list.length;
+
+  const el = document.getElementById("errList");
+  const prevScroll = el.scrollTop;
+  if (!list.length) {
+    el.innerHTML = `<div style="color:var(--ok);font-size:12.5px;padding:14px;line-height:1.65;">
+      ${baseErrs.length ? "当前筛选条件下暂无报错，可放宽分类/工具/日期条件。" : (healedCount ? `✅ 无非自愈报错！（另有 ${healedCount} 条 Agent 自愈记录，可在「归类统计」查看）` : "✅ 当前会话未检测到任何工具报错！")}
+    </div>`;
+    renderAnalyticsTab();
+    return;
+  }
+
+  const groups = [], gmap = new Map();
+  for (const e of list) {
+    const d = e.day || "未知日期";
+    if (!gmap.has(d)) { const g = { day: d, list: [] }; gmap.set(d, g); groups.push(g); }
+    gmap.get(d).list.push(e);
+  }
+
+  let html = "";
+  for (const g of groups) {
+    html += `<div class="tl-day-head"><span>📅 ${escHtml(g.day)}</span><span>${g.list.length} 条</span></div>`;
+    html += `<div class="tl-wrap">`;
+    for (const e of g.list) {
+      const seqNum = STATE.errors.indexOf(e) + 1;
+      const cs = ERR_CAT_STYLE[e.cat] || ERR_CAT_STYLE["其他报错"];
+      const rm = REC_META[e.rec] || REC_META.none;
+      const pInfo = getErrPageInfo(e.key);
+      const isOnPage = pInfo && pInfo.page === STATE.page;
+      const isActive = e.key === STATE.activeErrKey;
+      html += `
+      <div class="tl-card ${e.isCancel ? "cancelled" : ""} ${isOnPage ? "on-page" : ""} ${isActive ? "active" : ""}" data-ekey="${escHtml(e.key)}" onclick="jumpToErrKey('${escHtml(e.key)}', false)">
+        <div class="tl-top">
+          <span class="tl-time">
+            <span class="err-seq">#${seqNum}</span>
+            <span>${escHtml((e.ts || "").slice(11, 19))}</span>
+            <span class="stage-mini">${escHtml(e.stage)}</span>
+          </span>
+          <span style="display:inline-flex;gap:4px;align-items:center;">
+            ${pInfo ? `<span class="page-chip ${isOnPage ? "here" : ""}">${isOnPage ? "📍 本页" : `第${pInfo.page}页`}</span>` : ""}
+            <span class="cat-badge" style="background:${cs.bg};color:${cs.fg};">${escHtml(e.cat)}</span>
+          </span>
+        </div>
+        <div class="tl-tool">🔧 ${escHtml(e.tn)}${e.mn && e.mn !== e.tn ? ` <span style="font-weight:400;color:var(--muted);">(${escHtml(e.mn)})</span>` : ""}</div>
+        <div class="tl-err-snip">${escHtml(e.err.slice(0, 170))}${e.err.length > 170 ? "..." : ""}</div>
+        ${e.uCtx ? `<div class="tl-uctx">上文用户：“${escHtml(e.uCtx.slice(0, 72))}${e.uCtx.length > 72 ? "..." : ""}”</div>` : ""}
+        <div class="tl-foot">
+          <span class="rec-badge ${rm.cls}">${rm.label}</span>
+          <span style="color:var(--accent);font-weight:600;">定位上下文 →</span>
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+  el.scrollTop = prevScroll;
+  renderAnalyticsTab();
+}
+
+// 归类统计：完整包含 Agent 自愈（Requirement #4）
+function renderAnalyticsTab() {
+  const el = document.getElementById("statsPanel");
+  const allNonCxl = STATE.errors.filter(e => !e.isCancel);
+  const allShown = STATE.includeCxl ? STATE.errors : allNonCxl;
+  if (!allShown.length) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:12px;">暂无报错统计数据。</div>`;
+    return;
+  }
+
+  const feltCnt = allNonCxl.filter(e => !isSelfHealed(e)).length;
+  const selfCnt = allNonCxl.filter(e => e.rec === "self").length;
+  const switchCnt = allNonCxl.filter(e => e.rec === "switch").length;
+  const healTotal = selfCnt + switchCnt;
+  const healRate = allNonCxl.length ? (healTotal / allNonCxl.length * 100).toFixed(1) + "%" : "0%";
+
+  let html = `
+    <div class="kpi-strip">
+      <div class="kpi-mini err"><div class="v">${feltCnt}</div><div class="k">真实失败</div></div>
+      <div class="kpi-mini ok"><div class="v">${healTotal}</div><div class="k">Agent自愈${switchCnt ? ` (换Tool ${switchCnt})` : ""}</div></div>
+      <div class="kpi-mini accent"><div class="v">${healRate}</div><div class="k">Agent自愈率</div></div>
+    </div>`;
+
+  // 1. Recovery distribution (INCLUDING Agent自愈 & 换Tool自愈)
+  const recOrder = ["self", "switch", "user", "none", ...(STATE.includeCxl ? ["cancelled"] : [])];
+  const recCounts = new Map();
+  allShown.forEach(e => recCounts.set(e.rec, (recCounts.get(e.rec) || 0) + 1));
+
+  html += `<div class="stat-block"><h4><span>🔄 恢复状态分布（含 Agent 自愈）</span><span style="font-weight:400;color:var(--muted);font-size:11px;">共 ${allShown.length} 次</span></h4>`;
+  recOrder.forEach(rk => {
+    const cnt = recCounts.get(rk) || 0;
+    if (!cnt) return;
+    const pct = (cnt / allShown.length * 100).toFixed(1);
+    const rm = REC_META[rk];
+    const canJump = (rk === "user" || rk === "none" || rk === "cancelled");
+    html += `
+      <div class="bar-row" ${canJump ? `onclick="STATE.activeRec='${rk}';document.getElementById('recFilterSel').value='${rk}';switchRightTab('errors');renderErrSidebar();"` : `title="Agent 自愈仅在统计展示，不进入报错时间轴"`}>
+        <div class="bar-head"><span>${rm.label}</span><span><b>${cnt}</b> 次 (${pct}%)</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${rm.bar};"></div></div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  // 2. Category distribution (showing BOTH 真实失败 + Agent自愈)
+  const catMap = new Map();
+  allShown.forEach(e => {
+    if (!catMap.has(e.cat)) catMap.set(e.cat, { felt: 0, heal: 0, cxl: 0 });
+    const o = catMap.get(e.cat);
+    if (e.isCancel) o.cxl++;
+    else if (isSelfHealed(e)) o.heal++;
+    else o.felt++;
+  });
+  const catRows = Array.from(catMap.entries()).sort((a, b) => (b[1].felt + b[1].heal + b[1].cxl) - (a[1].felt + a[1].heal + a[1].cxl));
+
+  html += `<div class="stat-block"><h4><span>📌 按报错原因分类</span><span style="font-weight:400;color:var(--muted);font-size:11px;">红=真实失败 · 绿=自愈</span></h4>`;
+  catRows.forEach(([cat, o]) => {
+    const tot = o.felt + o.heal + o.cxl;
+    const pFelt = (o.felt / allShown.length * 100).toFixed(1);
+    const pHeal = (o.heal / allShown.length * 100).toFixed(1);
+    const pCxl = (o.cxl / allShown.length * 100).toFixed(1);
+    const cs = ERR_CAT_STYLE[cat] || ERR_CAT_STYLE["其他报错"];
+    html += `
+      <div class="bar-row" onclick="STATE.activeCat='${escHtml(cat)}';switchRightTab('errors');renderErrSidebar();">
+        <div class="bar-head">
+          <span><b>${escHtml(cat)}</b></span>
+          <span style="white-space:nowrap;">${o.felt ? `<b style="color:var(--danger);">失败${o.felt}</b>` : ""}${o.felt && o.heal ? " · " : ""}${o.heal ? `<span style="color:var(--ok);">自愈${o.heal}</span>` : ""}${o.cxl ? ` <span style="color:var(--warn);">取消${o.cxl}</span>` : ""}</span>
+        </div>
+        <div class="bar-track">
+          ${o.felt ? `<div class="bar-fill" style="width:${pFelt}%;background:${cs.bar};"></div>` : ""}
+          ${o.heal ? `<div class="bar-fill" style="width:${pHeal}%;background:#10b981;"></div>` : ""}
+          ${o.cxl ? `<div class="bar-fill" style="width:${pCxl}%;background:#f59e0b;"></div>` : ""}
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  // 3. Stage distribution (真实失败 + 自愈)
+  const stMap = new Map();
+  allNonCxl.forEach(e => {
+    if (!stMap.has(e.stage)) stMap.set(e.stage, { felt: 0, heal: 0 });
+    const o = stMap.get(e.stage);
+    if (isSelfHealed(e)) o.heal++; else o.felt++;
+  });
+  const stRows = Array.from(stMap.entries()).sort((a, b) => (b[1].felt + b[1].heal) - (a[1].felt + a[1].heal));
+  if (stRows.length) {
+    html += `<div class="stat-block"><h4><span>🎬 按制作阶段分布</span><span style="font-weight:400;color:var(--muted);font-size:11px;">点击跳转阶段</span></h4>`;
+    stRows.forEach(([st, o]) => {
+      const pF = (o.felt / allNonCxl.length * 100).toFixed(1);
+      const pH = (o.heal / allNonCxl.length * 100).toFixed(1);
+      html += `
+        <div class="bar-row" onclick="jumpToStage('${escHtml(st)}')">
+          <div class="bar-head">
+            <span><b>${escHtml(st)}</b></span>
+            <span>${o.felt ? `<b style="color:var(--danger);">失败${o.felt}</b>` : ""}${o.felt && o.heal ? " · " : ""}${o.heal ? `<span style="color:var(--ok);">自愈${o.heal}</span>` : ""}</span>
+          </div>
+          <div class="bar-track">
+            ${o.felt ? `<div class="bar-fill" style="width:${pF}%;background:#e11d48;"></div>` : ""}
+            ${o.heal ? `<div class="bar-fill" style="width:${pH}%;background:#10b981;"></div>` : ""}
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // 4. Tool Failure Rate (including Agent自愈)
+  const toolRows = [];
+  STATE.toolStats.forEach((st, tn) => {
+    const totBad = st.failed + st.healed + (STATE.includeCxl ? st.cancelled : 0);
+    if (totBad > 0) toolRows.push({ tn, failed: st.failed, healed: st.healed, total: st.total, rate: (st.failed / Math.max(1, st.total) * 100) });
+  });
+  toolRows.sort((a, b) => (b.failed + b.healed) - (a.failed + a.healed));
+  if (toolRows.length) {
+    html += `<div class="stat-block"><h4><span>🔧 按工具名统计（失败率与自愈）</span></h4>`;
+    toolRows.forEach(r => {
+      const pct = Math.min(100, r.rate).toFixed(1);
+      html += `
+        <div class="bar-row" onclick="toggleToolFilter('${escHtml(r.tn)}');switchRightTab('errors');">
+          <div class="bar-head">
+            <span style="font-family:var(--font-mono);font-size:11px;word-break:break-all;">${escHtml(r.tn)}</span>
+            <span style="white-space:nowrap;"><b>${r.failed}</b>/${r.total} (${pct}%)${r.healed ? ` · <span style="color:var(--ok);">自愈${r.healed}</span>` : ""}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#e11d48;"></div></div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+/* ============================================================================
+ * 9. 会话加载、一键清空与导出
+ * ========================================================================== */
+
+function renderMultiSessionList() {
+  const sec = document.getElementById("multiSessionSec");
+  if (STATE.sessions.length <= 1) { sec.style.display = "none"; return; }
+  sec.style.display = "block";
+  const filtered = STATE.sessions
+    .map((s, idx) => ({ s, idx }))
+    .filter(x => !STATE.onlyErrSessions || x.s.realErrCnt > 0);
+  document.getElementById("sessTotalCnt").textContent = `${filtered.length}/${STATE.sessions.length}`;
+  document.getElementById("sessionList").innerHTML = filtered.map(({ s, idx }) => `
+    <div class="sess-item ${idx === STATE.activeSessionIdx ? "active" : ""}" onclick="activateSession(${idx})" title="${escHtml(s.label)}">
+      <span class="sess-name">${escHtml(s.pid ? `PID ${s.pid} · ` : "")}${escHtml(s.label)}</span>
+      <span class="cnt ${s.realErrCnt ? "err" : "ok"}">${s.realErrCnt ? `❌${s.realErrCnt}` : "✅0"}</span>
+    </div>`).join("");
+}
+
+function setDataButtonsEnabled(enabled) {
+  document.getElementById("btnClearJson").disabled = !enabled;
+  document.getElementById("btnExportCsv").disabled = !enabled;
+  document.getElementById("btnExportJson").disabled = !enabled;
+}
+
+function activateSession(idx) {
+  const entry = STATE.sessions[idx];
+  if (!entry) return;
+  STATE.activeSessionIdx = idx;
+  const p = entry.parsed;
+  STATE.pid = p.pid;
+  STATE.sid = p.sid;
+  STATE.uid = p.uid;
+  STATE.config = p.config;
+  STATE.usedModels = p.usedModels;
+  STATE.furthestStage = p.furthestStage;
+  STATE.reachedStages = p.reachedStages;
+  STATE.stageErrCounts = p.stageErrCounts;
+  STATE.allItems = p.items;
+  STATE.errors = p.errors;
+  STATE.toolStats = p.toolStats;
+
+  STATE.selectedFidx = -1;
+  STATE.activeDay = "";
+  STATE.activeCat = "全部";
+  STATE.activeTool = "";
+  STATE.activeRec = "全部";
+  STATE.activeErrKey = "";
+  document.getElementById("recFilterSel").value = "全部";
+
+  setDataButtonsEnabled(true);
+  renderMultiSessionList();
+  renderConfigBar();
+  renderStageBar();
+  renderStatsOverview();
+  renderToolBreakdown();
+  renderDayList(true);
+  applyFilters(false);
+  document.getElementById("statusHint").textContent =
+    `${entry.label}（${STATE.allItems.length.toLocaleString()} 条记录 ｜ 真实报错 ${entry.realErrCnt} ｜ 自愈 ${entry.healCnt}）`;
+}
+
+// Requirement #2: One-click Clear Current JSON
+function clearAllData() {
+  STATE.transToken++;
+  STATE.sessions = [];
+  STATE.activeSessionIdx = -1;
+  STATE.pid = ""; STATE.sid = ""; STATE.uid = "";
+  STATE.config = null; STATE.usedModels = [];
+  STATE.furthestStage = STAGE_UNKNOWN;
+  STATE.reachedStages = new Set();
+  STATE.stageErrCounts = new Map();
+  STATE.allItems = [];
+  STATE.filteredItems = [];
+  STATE.errors = [];
+  STATE.toolStats = new Map();
+  STATE.selectedFidx = -1;
+  STATE.activeErrKey = "";
+  STATE.activeDay = "";
+  STATE.activeCat = "全部";
+  STATE.activeTool = "";
+  STATE.activeRec = "全部";
+  STATE.searchQuery = "";
+  STATE.searchHits = [];
+  STATE.hitPtr = -1;
+  STATE.page = 1;
+  cachedDayMap = new Map();
+
+  setDataButtonsEnabled(false);
+  document.getElementById("searchInput").value = "";
+  document.getElementById("searchCount").textContent = "0/0";
+  document.getElementById("pidBadge").textContent = "待加载";
+  document.getElementById("pidBadge").className = "status-pill";
+  document.getElementById("uidText").textContent = "";
+  document.getElementById("stErr").textContent = "0";
+  document.getElementById("stHeal").textContent = "0";
+  document.getElementById("stCxl").textContent = "0";
+  document.getElementById("stToolAllSub").textContent = "共0次";
+  document.getElementById("stRate").textContent = "-";
+  document.getElementById("tabErrCnt").textContent = "0";
+  document.getElementById("totalPages").textContent = "1";
+  document.getElementById("pageInput").value = "1";
+  document.getElementById("multiSessionSec").style.display = "none";
+  document.getElementById("configBar").classList.remove("show");
+  document.getElementById("stageBar").classList.remove("show");
+  document.getElementById("healHintBar").classList.remove("show");
+  document.getElementById("btnRetransPage").style.display = "none";
+  document.getElementById("toolReset").style.display = "none";
+  document.getElementById("dayReset").style.display = "none";
+  document.getElementById("toolBreakdown").innerHTML = `<div style="color:var(--muted);font-size:11.5px;">加载数据后显示各工具报错数</div>`;
+  document.getElementById("dayList").innerHTML = `<div style="color:var(--muted);font-size:12px;padding:4px 2px;">加载 JSON 后自动生成日期目录</div>`;
+  document.getElementById("errList").innerHTML = `<div style="color:var(--muted);font-size:12px;padding:12px;line-height:1.65;">加载 JSON 后，所有非自愈工具报错将按时间顺序排列在此。</div>`;
+  document.getElementById("statsPanel").innerHTML = `<div style="color:var(--muted);font-size:12px;padding:12px;">加载数据后自动生成报错分类、Agent 自愈与工具失败率统计。</div>`;
+  document.getElementById("catFilterSel").innerHTML = `<option value="全部">全部分类 (0)</option>`;
+  document.getElementById("recFilterSel").value = "全部";
+  document.getElementById("chatStream").innerHTML = DROPZONE_HTML;
+  document.getElementById("statusHint").textContent = "左：Agent 与报错卡片 ｜ 右：用户原话";
+  showToast("已清空当前 JSON 数据");
+}
+
+async function ingestFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  document.getElementById("statusHint").textContent = `⏳ 正在解析 ${files.length} 个文件...`;
+
+  const loaded = [];
+  for (const file of files) {
+    try {
+      if (file.name.toLowerCase().endsWith(".zip")) {
+        const buf = await file.arrayBuffer();
+        const jsonEntries = await readZipJsonFiles(buf);
+        for (const je of jsonEntries) {
+          try {
+            const doc = JSON.parse(je.text);
+            const parsed = parseAnijamJson(doc, je.name);
+            const realErrCnt = parsed.errors.filter(e => !e.isCancel && !isSelfHealed(e)).length;
+            const healCnt = parsed.errors.filter(e => isSelfHealed(e)).length;
+            const cxlCnt = parsed.errors.filter(e => e.isCancel).length;
+            loaded.push({ label: je.name, pid: parsed.pid, sid: parsed.sid, uid: parsed.uid, parsed, realErrCnt, healCnt, cxlCnt });
+          } catch (e) {}
+        }
+      } else {
+        const text = await file.text();
+        const doc = JSON.parse(text);
+        const parsed = parseAnijamJson(doc, file.name);
+        const realErrCnt = parsed.errors.filter(e => !e.isCancel && !isSelfHealed(e)).length;
+        const healCnt = parsed.errors.filter(e => isSelfHealed(e)).length;
+        const cxlCnt = parsed.errors.filter(e => e.isCancel).length;
+        loaded.push({ label: file.name, pid: parsed.pid, sid: parsed.sid, uid: parsed.uid, parsed, realErrCnt, healCnt, cxlCnt });
+      }
+    } catch (err) {
+      alert(`解析 ${file.name} 失败：\n${err.message}`);
+    }
+  }
+
+  if (!loaded.length) {
+    document.getElementById("statusHint").textContent = "⚠️ 未找到有效的 Anijam 对话 JSON 文件";
+    return;
+  }
+
+  loaded.sort((a, b) => b.realErrCnt - a.realErrCnt);
+  STATE.sessions = loaded;
+  activateSession(0);
+  if (loaded.length > 1) {
+    const totErr = loaded.reduce((s, x) => s + x.realErrCnt, 0);
+    showToast(`已加载 ${loaded.length} 个会话，累计 ${totErr} 条真实报错`);
+  }
+}
+
+function exportErrorsCsv() {
+  const list = getTimelineErrors();
+  if (!list.length) return alert("当前报错时间轴筛选下没有可导出的记录。");
+  const cols = ["序号","PID","SID","当前配置","制作阶段","报错时间","工具名","模型/引擎","报错分类","恢复状态","恢复时间","等待秒数","call_id","报错原文","上文用户原话","调用入参"];
+  const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const cfgStr = getConfigCopyString();
+  const lines = [cols.map(esc).join(",")];
+  list.forEach((e, i) => {
+    lines.push([
+      i + 1, STATE.pid, STATE.sid, cfgStr, e.stage, e.ts, e.tn, e.mn, e.cat,
+      (REC_META[e.rec] || REC_META.none).label, e.recTs, e.ws ?? "",
+      e.cid, e.err, e.uCtx, e.args
+    ].map(esc).join(","));
+  });
+  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `工具报错明细_${STATE.pid || STATE.sid || "anijam"}.csv`;
+  a.click();
+}
+
+function exportErrorsJson() {
+  const list = getTimelineErrors();
+  if (!list.length) return alert("当前报错时间轴筛选下没有可导出的记录。");
+  const out = {
+    pid: STATE.pid, sid: STATE.sid, config: STATE.config, furthest_stage: STATE.furthestStage,
+    self_healed_count: STATE.errors.filter(isSelfHealed).length,
+    errors: list.map((e, i) => ({
+      seq: i + 1, stage: e.stage, stage_basis: e.stageBasis, timestamp: e.ts,
+      tool_name: e.tn, model: e.mn, category: e.cat,
+      recovery: e.rec, recovery_time: e.recTs, wait_sec: e.ws,
+      tool_call_id: e.cid, error: e.err, user_context: e.uCtx,
+      arguments: safeJsonParse(e.args) || e.args
+    }))
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `工具报错明细_${STATE.pid || STATE.sid || "anijam"}.json`;
+  a.click();
+}
+
+function openLightbox(url) {
+  document.getElementById("lightboxImg").src = url;
+  document.getElementById("lightbox").classList.add("show");
+}
+
+function switchRightTab(tabName) {
+  document.querySelectorAll(".rtab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabName));
+  document.getElementById("tabPanelErrors").style.display = tabName === "errors" ? "flex" : "none";
+  document.getElementById("tabPanelStats").style.display = tabName === "stats" ? "flex" : "none";
+}
+
+/* ============================================================================
+ * 10. 事件绑定
+ * ========================================================================== */
+
+document.getElementById("btnUploadJson").onclick = () => document.getElementById("fileJson").click();
+document.getElementById("fileJson").onchange = e => { ingestFiles(e.target.files); e.target.value = ""; };
+document.getElementById("btnClearJson").onclick = clearAllData;
+document.getElementById("btnExportCsv").onclick = exportErrorsCsv;
+document.getElementById("btnExportJson").onclick = exportErrorsJson;
+document.getElementById("btnCopyConfig").onclick = () => copyText(getConfigCopyString(), "已复制当前 SID 配置");
+document.getElementById("btnRetransPage").onclick = () => autoTranslateVisiblePage();
+document.getElementById("cardSelfHeal").onclick = () => switchRightTab("stats");
+
+document.getElementById("btnGodMode").onclick = function() {
+  STATE.godMode = !STATE.godMode;
+  document.body.classList.toggle("god-on", STATE.godMode);
+  this.classList.toggle("btn-active", STATE.godMode);
+  this.textContent = STATE.godMode ? "👁️ 全量细节：开" : "👁️ 全量细节：关";
+  applyFilters(true);
+};
+
+document.getElementById("chkOnlyErrSess").onchange = e => { STATE.onlyErrSessions = e.target.checked; renderMultiSessionList(); };
+
+document.getElementById("pillErrCtx").onclick = function() {
+  STATE.onlyErrCtx = !STATE.onlyErrCtx;
+  if (STATE.onlyErrCtx) { STATE.onlyErrCards = false; document.getElementById("pillOnlyErr").classList.remove("on"); }
+  this.classList.toggle("on", STATE.onlyErrCtx);
+  applyFilters(false);
+};
+document.getElementById("pillOnlyErr").onclick = function() {
+  STATE.onlyErrCards = !STATE.onlyErrCards;
+  if (STATE.onlyErrCards) { STATE.onlyErrCtx = false; document.getElementById("pillErrCtx").classList.remove("on"); }
+  this.classList.toggle("on", STATE.onlyErrCards);
+  applyFilters(false);
+};
+const syncIncludeCxl = val => {
+  STATE.includeCxl = val;
+  document.getElementById("chkIncludeCxl").checked = val;
+  document.getElementById("pillShowCxl").classList.toggle("on", val);
+  renderToolBreakdown();
+  renderDayList(false);
+  applyFilters(false);
+};
+document.getElementById("pillShowCxl").onclick = () => syncIncludeCxl(!STATE.includeCxl);
+document.getElementById("chkIncludeCxl").onchange = e => syncIncludeCxl(e.target.checked);
+
+document.getElementById("pillShowMedia").onclick = function() {
+  STATE.showMedia = !STATE.showMedia;
+  this.classList.toggle("on", STATE.showMedia);
+  applyFilters(true);
+};
+document.getElementById("pillHideConfirm").onclick = function() {
+  STATE.hideConfirm = !STATE.hideConfirm;
+  this.classList.toggle("on", STATE.hideConfirm);
+  applyFilters(false);
+};
+document.getElementById("pillShowTrans").onclick = function() {
+  STATE.showTrans = !STATE.showTrans;
+  this.classList.toggle("on", STATE.showTrans);
+  renderChat(false);
+};
+document.getElementById("toolReset").onclick = () => { STATE.activeTool = ""; renderToolBreakdown(); applyFilters(false); };
+document.getElementById("dayReset").onclick = () => { STATE.activeDay = ""; renderDayList(false); applyFilters(false); };
+
+document.getElementById("btnToggleErrOrder").onclick = () => { STATE.errOrder = STATE.errOrder === "asc" ? "desc" : "asc"; renderErrSidebar(); };
+document.getElementById("btnPrevErr").onclick = () => stepErr(-1);
+document.getElementById("btnNextErr").onclick = () => stepErr(1);
+document.getElementById("catFilterSel").onchange = e => { STATE.activeCat = e.target.value; renderErrSidebar(); };
+document.getElementById("recFilterSel").onchange = e => { STATE.activeRec = e.target.value; renderErrSidebar(); };
+document.getElementById("chkFollowDay").onchange = e => { STATE.followDay = e.target.checked; renderErrSidebar(); };
+document.querySelectorAll(".rtab").forEach(tab => { tab.onclick = () => switchRightTab(tab.dataset.tab); });
+
+let searchTimer = null;
+const searchEl = document.getElementById("searchInput");
+searchEl.oninput = e => {
+  STATE.searchQuery = e.target.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => runSearch(true), 220);
+};
+searchEl.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); jumpToHit(e.shiftKey ? STATE.hitPtr - 1 : STATE.hitPtr + 1); }
+});
+document.getElementById("searchScope").onchange = e => { STATE.searchScope = e.target.value; runSearch(true); };
+document.getElementById("btnPrevHit").onclick = () => jumpToHit(STATE.hitPtr - 1);
+document.getElementById("btnNextHit").onclick = () => jumpToHit(STATE.hitPtr + 1);
+
+const goPage = p => {
+  const max = Math.max(1, Math.ceil(STATE.filteredItems.length / STATE.pageSize));
+  STATE.page = Math.min(max, Math.max(1, p));
+  renderChat(true);
+  renderErrSidebar();
+  const start = (STATE.page - 1) * STATE.pageSize;
+  const firstItem = STATE.filteredItems.slice(start, start + STATE.pageSize).find(x => x.r !== "gap");
+  if (firstItem) syncStageBarToItem(firstItem, start);
+};
+document.getElementById("btnFirstPage").onclick = () => goPage(1);
+document.getElementById("btnPrevPage").onclick = () => goPage(STATE.page - 1);
+document.getElementById("btnNextPage").onclick = () => goPage(STATE.page + 1);
+document.getElementById("btnLastPage").onclick = () => goPage(999999);
+document.getElementById("pageInput").onchange = e => goPage(parseInt(e.target.value, 10) || 1);
+document.getElementById("pageSizeSel").onchange = e => { STATE.pageSize = parseInt(e.target.value, 10); applyFilters(false); };
+
+window.addEventListener("dragover", e => { e.preventDefault(); document.getElementById("dropOverlay").classList.add("show"); });
+window.addEventListener("dragleave", e => { if (e.relatedTarget === null) document.getElementById("dropOverlay").classList.remove("show"); });
+window.addEventListener("drop", e => {
+  e.preventDefault();
+  document.getElementById("dropOverlay").classList.remove("show");
+  if (e.dataTransfer.files && e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files);
+});
+</script>
+</body>
+</html>
